@@ -66,7 +66,7 @@ validate_paths() {
         echo -e $missing | sed 's/;/\n/g'
         exit 1
     else
-        echo -e "Paths and Directories are valid. Proceeding...\n"
+        echo -e "\nPaths and Directories are valid. Proceeding..."
     fi
 }
 
@@ -78,8 +78,8 @@ validate_inputs() {
 		echo -e "$1 or $2 does not exist"
 		exit 1
 	else
-		echo -e "Begin WGS Pipeline for $filename1 and $filename2 \n"
-		echo -e "Begin WGS Pipeline for $filename1 and $filename2 \n" >> WGS_LabNotebook.txt
+		echo -e "Begin WGS Pipeline for $filename1 and $filename2..."
+		echo -e "Begin WGS Pipeline for $filename1 and $filename2..." >> WGS_LabNotebook.txt
 	fi
 }
 
