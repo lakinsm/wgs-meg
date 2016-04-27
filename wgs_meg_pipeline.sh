@@ -79,13 +79,13 @@ validate_inputs() {
 		exit 1
 	else
 		echo -e "Begin WGS Pipeline for $filename1 and $filename2..."
-		echo -e "Begin WGS Pipeline for $filename1 and $filename2..." >> WGS_LabNotebook.txt
+		echo -e "\nBegin WGS Pipeline for $filename1 and $filename2..." >> WGS_LabNotebook.txt
 	fi
 }
 
 
 get_versions() {
-	echo -e "Software versions:"
+	echo -e "Software versions:" >> WGS_LabNotebook.txt
 	$bbmap | grep "^BBMerge" >> WGS_LabNotebook.txt
 }
 
@@ -144,7 +144,7 @@ validate_inputs $forward $reverse
 # Find optimal k-mer length with BBMerge from BBMap
 bbmap_insert_size $forward $reverse
 
-
+echo "$insert"
 
 
 
