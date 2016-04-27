@@ -160,9 +160,10 @@ imetamos_run() {
     ## Note that this function utilizes global variables.
     
     "${metamos}"/initPipeline -q -1 $forward -2 $reverse -d "${temp_dir}/${sample_name}" -i $insert -W iMetAMOS
-    "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss -b -z genus -d "${temp_dir}/${sample_name}"
+    kmer=$( "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss -b -z genus -d "${temp_dir}/${sample_name}" | grep "Selected kmer size" | grep -Po "[0-9]{1,4}" )
+    echo "Kmer size is: $kmer"
     
-    
+    #if [ ! -f "${metamos}/${sample_name}"/Assemble/out/idba-ud
     
     
 }
@@ -181,10 +182,10 @@ while [[ "${1+defined}"  ]]; do
 	    	reverse=$2
 	    	shift 2
 	    	;;
-            -h | --help)
-                display_help
-                exit 0
-                ;;
+        -h | --help)
+            display_help
+            exit 0
+            ;;
 	    -o | --output)
 	        output_dir=$2
 	        shift 2
@@ -222,7 +223,7 @@ if [ ! -d "$temp_dir" ]; then
 fi
 
 if [ ! -d "$output_dir" ]; then
-        mkdir "$output_dir"
+    mkdir "$output_dir"
 fi
 
 ## Make sure everything is set up properly
