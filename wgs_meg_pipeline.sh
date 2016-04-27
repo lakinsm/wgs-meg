@@ -24,7 +24,7 @@ fi
 ########
 
 #Display help menu
-displayHelp () {
+display_help () {
     echo "
     Usage: wgs_meg_pipeline.sh [options] -1 forward_reads.fastq -2 reverse_reads.fastq
     
@@ -92,7 +92,7 @@ validate_paths() {
     
     #--------------------------------
     
-    if [ ! -e "${sample_name}" ]; then
+    if [ "${sample_name}" == "" ]; then
         local missing="$missing:SampleName;"
     fi
     
@@ -102,7 +102,7 @@ validate_paths() {
         local missing="$missing:TemporaryDirectory;"
     fi
     
-    if [ ! -d "${out_dir}" ]; then
+    if [ ! -d "${output_dir}" ]; then
         local missing="$missing:OutputDirectory;"
     fi
     
@@ -181,6 +181,10 @@ while [[ "${1+defined}"  ]]; do
 	    	reverse=$2
 	    	shift 2
 	    	;;
+            -h | --help)
+                display_help
+                exit 0
+                ;;
 	    -o | --output)
 	        output_dir=$2
 	        shift 2
@@ -215,6 +219,10 @@ done
 ## If you aren't careful with explicit passing of variables, you can end up deleting unintended things
 if [ ! -d "$temp_dir" ]; then
 	mkdir "$temp_dir"
+fi
+
+if [ ! -d "$output_dir" ]; then
+        mkdir "$output_dir"
 fi
 
 ## Make sure everything is set up properly
