@@ -85,6 +85,7 @@ validate_inputs() {
 
 
 get_versions() {
+	echo -e "Software versions:"
 	$bbmap | grep "^BBMerge" >> WGS_LabNotebook.txt
 }
 
@@ -136,8 +137,8 @@ fi
 
 ## Make sure everything is set up properly
 validate_paths
-validate_inputs $forward $reverse
 get_versions
+validate_inputs $forward $reverse
 
 
 # Find optimal k-mer length with BBMerge from BBMap
