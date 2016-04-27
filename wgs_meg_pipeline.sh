@@ -103,7 +103,7 @@ bbmap_insert_size() {
 while [[ "${1+defined}"  ]]; do
     case "$1" in
 		-1 | --i1)
-			forward=$1
+			forward=$2
 			shift 2
 			;;
 	    -2 | --i2)
