@@ -50,7 +50,7 @@ validate_paths() {
    	
    	" >> WGS_LabNotebook.txt
    	
-   	if [ ! -d "${bbmap}" ]; then
+   	if [ ! -e "${bbmap}" ]; then
         local missing="$missing:BBMap;"
     fi
     
