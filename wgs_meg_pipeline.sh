@@ -161,7 +161,7 @@ imetamos_run() {
     
     "${metamos}"/initPipeline -q -1 $forward -2 $reverse -d "${temp_dir}/${sample_name}" -i $insert -W iMetAMOS
     kmer=$( "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss -b -z genus -d "${temp_dir}/${sample_name}" | grep "Selected kmer size" | grep -Po "[0-9]{1,4}" )
-    echo "Kmer size is: $kmer"
+    
     
     #if [ ! -f "${metamos}/${sample_name}"/Assemble/out/idba-ud
     
@@ -240,7 +240,9 @@ bbmap_insert_size $forward $reverse
 
 ## Assemble using MetAmos: velvet, spades, idba, abyss
 imetamos_run
-
+if [ $? -ne 0 ]; then
+    echo "Kmer size is: $kmer"
+fi
 ## 
 
 
