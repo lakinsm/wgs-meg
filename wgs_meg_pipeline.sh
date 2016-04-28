@@ -269,17 +269,16 @@ imetamos_run() {
             genome_size="2944528"
         fi
         
-        echo "${which_assemblies[@]}"
-        echo -e "count=${valid_assemblies}\n" >> "${temp_dir}/Merge.config"
+        echo -e "count=${valid_assemblies}" >> "${temp_dir}/Merge.config"
         for i in "${which_assemblies[@]}"; do
             fullpath=$( readlink -f  "$i" )
             assembler=$( echo $i | grep -Po "(abyss|idba|velvet|spades|edena)" )
-            echo -e "data=${fullpath},title=${assembler}\n" >> "${temp_dir}/Merge.config"
+            echo -e "data=${fullpath},title=${assembler}" >> "${temp_dir}/Merge.config"
         done
         echo -e "Master_file=${output_dir}/${sample_name}_merged_contigs.fa" >> "${temp_dir}/Merge.config"
         
         
-        echo -e "genome=${genome_size}\ninfile=${output_dir}/${sample_name}_merged_contigs.fa\noutfile=${output_dir}/${sample_name}_cisa_integrated.fa\n" >> "${temp_dir}/CISA.config"
+        echo -e "genome=${genome_size}\ninfile=${output_dir}/${sample_name}_merged_contigs.fa\noutfile=${output_dir}/${sample_name}_cisa_integrated.fa" >> "${temp_dir}/CISA.config"
         echo -e "nucmer=${nucmer}\nR2_gap=0.95\nCISA=${cisa}\nmakeblastdb=${blastdb}\nblastn=${blastn}" >> "${temp_dir}/CISA.config"
     fi
 }
