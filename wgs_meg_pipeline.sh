@@ -519,7 +519,7 @@ n_mask() {
 ksnp_run() {
 	## kSNP3 generates a distance matrix and Phylip tree output
 	## We will store those outputs as well as turn the Phylip into strict Phylip for further use
-	if [ ! -d ${sample_name}_ksnp
+	if [ ! -d ${sample_name}_ksnp ]; then
 	    mkdir ${sample_name}_ksnp
 	fi
 	
