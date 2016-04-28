@@ -654,7 +654,7 @@ echo -e "Beginning Alignment pipeline..." >> WGS_LabNotebook.txt
 #plasmid_align
 
 ## Pick the correct reference genome
-#choose_reference
+choose_reference
 
 ## Align to reference genome
 ref_align
