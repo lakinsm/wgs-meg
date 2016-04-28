@@ -35,6 +35,7 @@ display_help () {
     Pipeline Options:
         -1 | --i1   FILE            Forward input fastq file
         -2 | --i2   FILE            Reverse input fastq file
+        -a | --assembly             Flag: run assembly pipeline on this sample (slower)
         -o | --output DIR           Directory for output of important files (main output dir)
         -s | --sample_name  STR     Main file name for this sample throughout the pipeline
         -spp| --species STR         Species identifier string (see documentation for details)
@@ -56,6 +57,13 @@ cisa="/s/angus/index/common/tools/CISA1.3"
 blastdb="/usr/bin/makeblastdb"
 blastn="/usr/bin/blastn"
 prokka="/s/angus/index/common/tools/prokka/prokka-1.11/bin/prokka"
+trimmomatic="/s/angus/index/common/tools/Trimmomatic-0-1.32"
+bwa="/usr/bin/bwa"
+amrdb="/s/angus/index/databases/resistance_databases/databases/meta-marc/src/mmarc_groupIII_seqs.fasta"
+vfdb="/s/angus/index/databases/bwa_indexes/VFDB/New_VFDB_4_4_2016/VFDB_setA_nt_4_4_2016.fas"
+plasmiddb="/s/angus/index/databases/plasmid/all_plasmid_seqs.fasta"
+samratio="/s/angus/index/common/tools/samratio.jar"
+Lmono="/s/angus/index/projs/listeria_wgs/genomes_and_annotations/LM_annotations/LM_Refseq"
 
 ## Paths to output directories
 temp_dir=""
@@ -64,6 +72,7 @@ output_dir=""
 ## Flags and variables used in the pipeline
 sample_name=""
 spp_pipeline="Lmonocytogenes"
+run_assembly=0
 best_assembly=""  # used in the event of less than 3 assemblies from metamos
 insert=0  # insert size as determined by bbmerge
 kmer=0  # k-mer size determined by specialk in metamos
@@ -92,6 +101,12 @@ validate_paths() {
     makeblastdb:              ${blastdb}
     blastn:                   ${blastn}
     prokka:                   ${prokka}
+    Trimmomatic:              ${trimmomatic}
+    BWA:                      ${bwa}
+    SamRatio:                 ${samratio}
+    AMR Database:             ${amrdb}
+    Virulence Database:       ${vfdb}
+    Plasmid Database:         ${plasmiddb}
 
     
     Directories selected:
@@ -126,6 +141,30 @@ validate_paths() {
     
     if [ ! -e "${prokka}" ]; then
     	local missing="$missing:prokka;"
+    fi
+    
+    if [ ! -e "${trimmomatic}" ]; then
+    	local missing="$missing:Trimmomatic;"
+    fi
+    
+    if [ ! -e "${bwa}" ]; then
+    	local missing="$missing:BWA;"
+    fi
+    
+    if [ ! -e "${samratio}" ]; then
+    	local missing="$missing:SamRatio;"
+    fi
+    
+    if [ ! -e "${amrdb}" ]; then
+    	local missing="$missing:AMRDatabase;"
+    fi
+    
+    if [ ! -e "${vfdb}" ]; then
+    	local missing="$missing:VirulenceDatabase;"
+    fi
+    
+    if [ ! -e "${plasmiddb}" ]; then
+    	local missing="$missing:PlasmidDatabase;"
     fi
     
     #--------------------------------
@@ -188,6 +227,13 @@ get_versions() {
 }
 
 
+choose_reference() {
+    ## Pick the appropriate reference based on the input species
+    if [ "${spp_pipeline}" == "Lmonocytogenes" ]; then
+        refgenome="${Lmono}"
+    fi
+}
+
 
 bbmap_insert_size() {
 	## We need to capture stderr from bbmerge to regex capture the insert range.
@@ -209,52 +255,46 @@ imetamos_run() {
     ## We will create BOTH CISA input files within this function, then check to see they are of valid
     ## format to run with CISA.
     ## Note that this function utilizes global variables.
+
+    echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..."
+    echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..." >> WGS_LabNotebook.txt
+    "${metamos}"/initPipeline -q -1 $forward -2 $reverse -d "${temp_dir}/${sample_name}" -i $insert -W iMetAMOS
+    kmer=$( "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss,edena -b -z genus -d "${temp_dir}/${sample_name}" | grep "Selected kmer size" | grep -Po "[0-9]{1,4}" )
     
-    #if [ ! -f "${output_dir}"/velvet_assembly.contig] || [ ! -f "${output_dir}"/abyss_assembly.contig ] || [ ! -f "${output_dir}"/spades_assembly.contig ] || [ ! -f "${output_dir}"/idba_assembly.contig ] || [ ! -f "${output_dir}"/edena_assembly.contig ]; then
-        echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..."
-        echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..." >> WGS_LabNotebook.txt
-        #"${metamos}"/initPipeline -q -1 $forward -2 $reverse -d "${temp_dir}/${sample_name}" -i $insert -W iMetAMOS
-        #kmer=$( "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss,edena -b -z genus -d "${temp_dir}/${sample_name}" | grep "Selected kmer size" | grep -Po "[0-9]{1,4}" )
-        
-        #echo "Kmer test: $kmer" >> kmer_test.txt  # debugging
-        kmer="71"
-        
-        valid_assemblies=0
-        which_assemblies=()
-        
-        if [ -f "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" ]; then
-            ((valid_assemblies++))
-            which_assemblies=(${which_assemblies[@]} ${output_dir}/idba_assembly.contig)
-            cp "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" "${output_dir}"/idba_assembly.contig
-        fi
-        
-        if [ -f "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" ]; then
-            ((valid_assemblies++))
-            which_assemblies=(${which_assemblies[@]} ${output_dir}/spades_assembly.contig)
-            cp "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" "${output_dir}"/spades_assembly.contig
-        fi
-        
-        if [ -f "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" ]; then
-            ((valid_assemblies++))
-            which_assemblies=(${which_assemblies[@]} ${output_dir}/velvet_assembly.contig)
-            cp "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" "${output_dir}"/velvet_assembly.contig
-        fi
-        
-        if [ -f "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" ]; then
-            ((valid_assemblies++))
-            which_assemblies=(${which_assemblies[@]} ${output_dir}/abyss_assembly.contig)
-            cp "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" "${output_dir}"/abyss_assembly.contig
-        fi
-        
-        if [ -f "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" ]; then
-            ((valid_assemblies++))
-            which_assemblies=(${which_assemblies[@]} ${output_dir}/edena_assembly.contig)
-            cp "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" "${output_dir}"/edena_assembly.contig
-        fi
-    #else
-    #    echo -e "MetAMOS assembly files already detected for sample, proceeding..."
-    #    echo -e "MetAMOS assembly files already detected for sample, proceeding..." >> WGS_LabNotebook.txt
-    #fi
+    echo "Kmer test: $kmer" >> kmer_test.txt  # debugging
+    
+    valid_assemblies=0
+    which_assemblies=()
+    
+    if [ -f "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" ]; then
+        ((valid_assemblies++))
+        which_assemblies=(${which_assemblies[@]} ${output_dir}/idba_assembly.contig)
+        cp "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" "${output_dir}"/idba_assembly.contig
+    fi
+    
+    if [ -f "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" ]; then
+        ((valid_assemblies++))
+        which_assemblies=(${which_assemblies[@]} ${output_dir}/spades_assembly.contig)
+        cp "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" "${output_dir}"/spades_assembly.contig
+    fi
+    
+    if [ -f "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" ]; then
+        ((valid_assemblies++))
+        which_assemblies=(${which_assemblies[@]} ${output_dir}/velvet_assembly.contig)
+        cp "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" "${output_dir}"/velvet_assembly.contig
+    fi
+    
+    if [ -f "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" ]; then
+        ((valid_assemblies++))
+        which_assemblies=(${which_assemblies[@]} ${output_dir}/abyss_assembly.contig)
+        cp "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" "${output_dir}"/abyss_assembly.contig
+    fi
+    
+    if [ -f "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" ]; then
+        ((valid_assemblies++))
+        which_assemblies=(${which_assemblies[@]} ${output_dir}/edena_assembly.contig)
+        cp "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" "${output_dir}"/edena_assembly.contig
+    fi
     
     ## This note is for when we run into bugs with bad assemblies (and we will at some point):
     ## Make sure this section is assigning variables correctly for best assembly
@@ -332,8 +372,78 @@ prokka_annotate() {
     
     echo -e "Beginning annotation with prokka..."
     
-    $prokka --genus $genus --species $species --usegenus --addgenes --cpus $threads --prefix "${sample_name}_prokka" ${best_assembly}
+    $prokka --genus $genus --species $species --usegenus --addgenes --cpus $threads --prefix "${sample_name}_prokka_${1}" ${best_assembly}
     
+}
+
+
+trim_reads() {
+    if [ ! -f "${temp_dir}/1p.fastq" ] || [ ! -f "${temp_dir}/2p.fastq" ]; then
+        echo -e "Beginning read trimming..."
+        echo -e "Beginning read trimming..." >> WGS_LabNotebook.txt
+        java -jar "${trimmomatic}/trimmomatic-0.32.jar" PE -threads $threads -phred33 $forward $reverse "${temp_dir}/1p.fastq" "${temp_dir}/1u.fastq" "${temp_dir}/2p.fastq" "${temp_dir}/2u.fastq" ILLUMINACLIP:"${trimmomatic}/adapters/TruSeq3-PE.fa:2:30:10:3:TRUE" LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+    else
+        echo -e "Trimmed reads already detected, proceeding with alignments..."
+        echo -e "Trimmed reads already detected, proceeding with alignments..." >> WGS_LabNotebook.txt
+    fi
+}
+
+
+amr_align() {
+    if [ ! -f "${output_dir}/${sample_name}_amr_parsed.csv" ]; then
+        echo -e "Aligning to AMR database..."
+        echo -e "Aligning to AMR database..." >> WGS_LabNotebook.txt
+        $bwa aln ${amrdb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
+        $bwa aln ${amrdb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
+        $bwa sampe -n 1000 -N 1000 ${amrdb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/amr.sam
+        java -jar ${samratio} -d ${amrdb} -i ${temp_dir}/amr.sam -t 1 -o "${output_dir}/${sample_name}_amr_parsed.csv"
+        
+        rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/amr.sam
+    else
+        echo -e "AMR parsed file detected, proceeding..."
+        echo -e "AMR parsed file detected, proceeding..." >> WGS_LabNotebook.txt
+    fi
+}
+
+
+vfdb_align() {
+    if [ ! -f "${output_dir}/${sample_name}_vfdb_parsed.csv" ]; then
+        echo -e "Aligning to Virulence database..."
+        echo -e "Aligning to Virulence database..." >> WGS_LabNotebook.txt
+        $bwa aln ${vfdb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
+        $bwa aln ${vfdb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
+        $bwa sampe -n 1000 -N 1000 ${vfdb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/vfdb.sam
+        java -jar ${samratio} -d ${vfdb} -i ${temp_dir}/vfdb.sam -t 1 -o "${output_dir}/${sample_name}_vfdb_parsed.csv"
+        
+        rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/vfdb.sam
+    else
+        echo -e "VFDB parsed file detected, proceeding..."
+        echo -e "VFDB parsed file detected, proceeding..." >> WGS_LabNotebook.txt
+    fi
+}
+
+
+plasmid_align() {
+    if [ ! -f "${output_dir}/${sample_name}_plasmid_parsed.csv" ]; then
+        echo -e "Aligning to Plasmid database..."
+        echo -e "Aligning to Plasmid database..." >> WGS_LabNotebook.txt
+        $bwa aln ${plasmiddb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
+        $bwa aln ${plasmiddb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
+        $bwa sampe -n 1000 -N 1000 ${plasmiddb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/plasmid.sam
+        java -jar ${samratio} -d ${plasmiddb} -i ${temp_dir}/plasmid.sam -t 1 -o "${output_dir}/${sample_name}_plasmid_parsed.csv"
+        
+        rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/plasmid.sam
+    else
+        echo -e "Plasmid parsed file detected, proceeding..."
+        echo -e "Plasmid parsed file detected, proceeding..." >> WGS_LabNotebook.txt
+    fi
+}
+
+
+ref_align() {
+    ## Align to the reference genome chosen in the previous steps
+    ## We will use BWA mem here, since whole genome alignment is what it was designed to do
+    bwa mem -t $threads "${refgenome}" $forward $reverse > ${temp_dir}/ref.sam
 }
 
 
@@ -350,6 +460,10 @@ while [[ "${1+defined}"  ]]; do
 	    	reverse=$2
 	    	shift 2
 	    	;;
+	    -a | --assembly)
+	        run_assembly=1
+	        shift 1
+	        ;;
         -h | --help)
             display_help
             exit 0
@@ -407,19 +521,47 @@ validate_inputs $forward $reverse
 ##############
 ## Assembly ##
 ##############
-## Find average insert size with BBMerge from BBMap
-bbmap_insert_size $forward $reverse
+if [ "${run_assembly}" == "1" ]; then
+    ## Find average insert size with BBMerge from BBMap
+    bbmap_insert_size $forward $reverse
 
-## Assemble using MetAmos: velvet, spades, idba, abyss
-imetamos_run
+    ## Assemble using MetAmos: velvet, spades, idba, abyss
+    imetamos_run
 
-## Merge contigs with CISA if applicable
-if [ "${best_assembly}" == "" ]; then
-    cisa_run
+    ## Merge contigs with CISA if applicable
+    if [ "${best_assembly}" == "" ]; then
+        cisa_run
+    fi
+    
+    ## Truncate headers of best assembly for prokka
+    mv "${best_assembly}" "${best_assembly}_temp"
+    python3 ./truncate_headers.py "${best_assembly}_temp" > "${best_assembly}"
+    rm "${best_assembly}_temp"
+
+    ## Annotate the best assembly, either CISA or the single best from MetAMOS
+    prokka_annotate "assembly"
+    
+    echo -e "Assembly pipeline complete."
+    echo -e "Assembly pipeline complete." >> WGS_LabNotebook.txt
 fi
 
-## Annotate the best assembly, either CISA or the single best from MetAMOS
-prokka_annotate
+
+###############
+## Alignment ##
+###############
+## Preprocess the reads
+trim_reads
+
+## Align to the AMR database, VFDB, and Plasmid database
+amr_align
+vfdb_align
+plasmid_align
+
+## Pick the correct reference genome
+choose_reference
+
+## Align to reference genome
+ref_align
 
 
 
