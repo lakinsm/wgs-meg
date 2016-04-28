@@ -38,6 +38,6 @@ if __name__=='__main__':
 	counter = 0
 	for header, seq in fasta_parse(sys.argv[1]):
 		counter += 1
-		sys.stdout.write('>'+header[:18]+'|'+str(counter)+'\n'+seq+'\n')
+		sys.stdout.write('>'+header[:12]+'|'+str(counter)+'\n'+seq+'\n')
 
 

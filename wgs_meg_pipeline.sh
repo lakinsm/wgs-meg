@@ -525,6 +525,8 @@ ksnp_run() {
 	
 	chosen_k=19  # this is temporary while we debug kchooser
 	
+	## Need to make KSNP input file here, but we need to agree on our method for this first
+	
 	$ksnp -in ${temp_dir}/ksnp.infile -outdir ${sample_name}_ksnp -k ${chosen_k}
 }
 
@@ -646,12 +648,12 @@ fi
 echo -e "Beginning Alignment pipeline..."
 echo -e "Beginning Alignment pipeline..." >> WGS_LabNotebook.txt
 ## Preprocess the reads
-#trim_reads
+trim_reads
 
 ## Align to the AMR database, VFDB, and Plasmid database
-#amr_align
-#vfdb_align
-#plasmid_align
+amr_align
+vfdb_align
+plasmid_align
 
 ## Pick the correct reference genome
 choose_reference
@@ -664,6 +666,9 @@ if [ "${consensus_file}" == "" ]; then
     echo -e "Consensus file creation failed; check the logs."
     echo -e "\tConsensus file creation failed; check the logs." >> WGS_LabNotebook.txt
 else
+    mv "${consensus_file}" "${consensus_file}_temp"
+    python3 ${RELPATH}/truncate_headers.py "${consensus_file}_temp" > "${consensus_file}"
+    rm "${consensus_file}_temp"
     prokka_annotate "align_consensus" "${consensus_file}"
 fi
 
@@ -677,16 +682,18 @@ echo -e "Beginning kSNP pipeline..."
 echo -e "Beginning kSNP pipeline..." >> WGS_LabNotebook.txt
 ## Perform N-masking on the trimmed reads from the Trimmomatic step
 ## Pass these into the kSNP pipeline
-n_mask
+#n_mask
 
 ## Run KChooser (we're still figuring out the debugging on this, to be implemented later)
 
 ## Run kSNP3
-ksnp_run
+## this needs to be discussed before implemented.  We need to set up a continual reuse case
+#ksnp_run
 
 echo -e "kSNP pipeline complete."
 echo -e "kSNP pipeline complete." >> WGS_LabNotebook.txt
 
+#cleanup
 
 exit 0
 
