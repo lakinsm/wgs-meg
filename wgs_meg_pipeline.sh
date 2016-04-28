@@ -18,6 +18,8 @@ if [ ! "$BASH_VERSION" ] ; then
     exit 1
 fi
 
+shopt -s extglob
+
 
 ########
 # Help #
@@ -288,6 +290,8 @@ imetamos_run() {
         echo -e "genome=${genome_size}\ninfile=${output_dir}/${sample_name}_merged_contigs.fa\noutfile=${output_dir}/${sample_name}_cisa_integrated.fa" >> "${temp_dir}/CISA.config"
         echo -e "nucmer=${nucmer}\nR2_gap=0.95\nCISA=${cisa}\nmakeblastdb=${blastdb}\nblastn=${blastn}" >> "${temp_dir}/CISA.config"
     fi
+    
+    rm flowchart.svg
 }
 
 
@@ -302,6 +306,18 @@ cisa_run() {
         echo -e "CISA failed to produce the expected merged file.  Please check the logs."
         echo -e "CISA failed to produce the expected merged file.  Please check the logs." >> WGS_LabNotebook.txt
     fi
+    
+    for i in ${output_dir}/*; do
+        if [[ $i =~ (.p.fa) ]]; then
+            rm $i
+        fi
+    done
+    
+    rm -rf CISA1 CISA2 CISA3 CISA4
+    rm CISA2_thr.out
+    rm info info1 info2 Merge_info
+    rm R1_Contigs.fa
+    rm R2_Contigs.fa
 }
 
 
