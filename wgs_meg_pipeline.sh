@@ -35,6 +35,7 @@ display_help () {
         -2 | --i2   FILE            Reverse input fastq file
         -o | --output DIR           Directory for output of important files (main output dir)
         -s | --sample_name  STR     Main file name for this sample throughout the pipeline
+        -spp| --species STR         Species identifier string (see documentation for details)
         -t | --threads  INT         Threads to use where applicable
         -td| --temp_dir DIR         Temporary directory for intermediate dirs/files
 
@@ -48,6 +49,10 @@ display_help () {
 ## Paths to program executables or jar files where noted
 bbmap="/s/angus/index/common/tools/BBMap_35.85/bbmap/bbmerge.sh"
 metamos="/s/angus/index/common/tools/metAMOS-1.5rc3"
+nucmer="/s/angus/index/common/tools/MUMmer3.23/nucmer"
+cisa="/s/angus/index/common/tools/CISA1.3"
+blastdb="/usr/bin/makeblastdb"
+blastn="/usr/bin/blastn"
 
 ## Paths to output directories
 temp_dir=""
@@ -55,7 +60,11 @@ output_dir=""
 
 ## Flags and variables used in the pipeline
 sample_name=""
+spp_pipeline="Lmonocytogenes"
+best_assembly=""  # used in the event of less than 3 assemblies from metamos
 insert=0  # insert size as determined by bbmerge
+kmer=0  # k-mer size determined by specialk in metamos
+genome_size=0  # genome size for this particular organism
 threads=1  # threads to use where applicable, recommend ~ 20
 
 
@@ -70,10 +79,15 @@ validate_paths() {
 
     echo "
     Sample name this run:     ${sample_name}
+    Species for this run:     ${spp_pipeline}
     
     Paths currently set:
     BBmap bbmerge:            ${bbmap}
     iMetAmos:                 ${metamos}
+    nucmer:                   ${nucmer}
+    CISA:                     ${cisa}
+    makeblastdb:              ${blastdb}
+    blastn:                   ${blastn}
 
     
     Directories selected:
@@ -90,10 +104,30 @@ validate_paths() {
     	local missing="$missing:iMetAmos;"
     fi
     
+    if [ ! -e "${nucmer}" ]; then
+    	local missing="$missing:nucmer;"
+    fi
+    
+    if [ ! -e "${cisa}" ]; then
+    	local missing="$missing:CISA;"
+    fi
+    
+    if [ ! -e "${blastdb}" ]; then
+    	local missing="$missing:makeblastdb;"
+    fi
+    
+    if [ ! -e "${blastn}" ]; then
+    	local missing="$missing:blastn;"
+    fi
+    
     #--------------------------------
     
     if [ "${sample_name}" == "" ]; then
         local missing="$missing:SampleName;"
+    fi
+    
+    if [ "${spp_pipeline}" == "" ]; then
+        local missing="$missing:SpeciesPipeline;"
     fi
     
     #--------------------------------
@@ -123,6 +157,10 @@ validate_inputs() {
 	if [ ! -e "$1" ] || [ ! -e "$2" ]; then
 		echo -e "$1 or $2 does not exist"
 		exit 1
+	elif [ ! "${spp_pipeline}" == "Lmonocytogenes" ]; then
+	    echo -e "${spp_pipeline} is not in the list of accepted species identifiers. See documentation"
+	    echo -e "${spp_pipeline} is not in the list of accepted species identifiers. See documentation" >> WGS_LabNotebook.txt
+	    exit 1
 	else
 		echo -e "Begin WGS Pipeline for $filename1 and $filename2..."
 		echo -e "\nBegin WGS Pipeline for $filename1 and $filename2..." >> WGS_LabNotebook.txt
@@ -134,6 +172,10 @@ get_versions() {
 	echo -e "Software versions:" >> WGS_LabNotebook.txt
 	$bbmap | grep "^BBMerge" >> WGS_LabNotebook.txt
 	head -n 1 ${metamos}/README.md | grep -Po "MetAMOS.*\" " >> WGS_LabNotebook.txt
+	$nucmer | grep "NUCmer" >> WGS_LabNotebook.txt
+	echo $cisa | grep -Po "CISA[0-9].[0-9]" >> WGS_LabNotebook.txt
+	$blastdb -version | head -n 1 >> WGS_LabNotebook.txt
+	$blastn -version | head -n 1 >> WGS_LabNotebook.txt
 }
 
 
@@ -159,13 +201,86 @@ imetamos_run() {
     ## format to run with CISA.
     ## Note that this function utilizes global variables.
     
-    "${metamos}"/initPipeline -q -1 $forward -2 $reverse -d "${temp_dir}/${sample_name}" -i $insert -W iMetAMOS
-    kmer=$( "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss -b -z genus -d "${temp_dir}/${sample_name}" | grep "Selected kmer size" | grep -Po "[0-9]{1,4}" )
+    #if [ ! -f "${output_dir}"/velvet_assembly.contig] || [ ! -f "${output_dir}"/abyss_assembly.contig ] || [ ! -f "${output_dir}"/spades_assembly.contig ] || [ ! -f "${output_dir}"/idba_assembly.contig ] || [ ! -f "${output_dir}"/edena_assembly.contig ]; then
+        echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..."
+        echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..." >> WGS_LabNotebook.txt
+        #"${metamos}"/initPipeline -q -1 $forward -2 $reverse -d "${temp_dir}/${sample_name}" -i $insert -W iMetAMOS
+        #kmer=$( "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss,edena -b -z genus -d "${temp_dir}/${sample_name}" | grep "Selected kmer size" | grep -Po "[0-9]{1,4}" )
+        
+        #echo "Kmer test: $kmer" >> kmer_test.txt  # debugging
+        kmer="71"
+        
+        valid_assemblies=0
+        which_assemblies=()
+        
+        if [ -f "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" ]; then
+            ((valid_assemblies++))
+            which_assemblies=(${which_assemblies[@]} ${output_dir}/idba_assembly.contig)
+            mv "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" "${output_dir}"/idba_assembly.contig
+        fi
+        
+        if [ -f "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" ]; then
+            ((valid_assemblies++))
+            which_assemblies=(${which_assemblies[@]} ${output_dir}/spades_assembly.contig)
+            mv "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" "${output_dir}"/spades_assembly.contig
+        fi
+        
+        if [ -f "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" ]; then
+            ((valid_assemblies++))
+            which_assemblies=(${which_assemblies[@]} ${output_dir}/velvet_assembly.contig)
+            mv "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" "${output_dir}"/velvet_assembly.contig
+        fi
+        
+        if [ -f "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" ]; then
+            ((valid_assemblies++))
+            which_assemblies=(${which_assemblies[@]} ${output_dir}/abyss_assembly.contig)
+            mv "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" "${output_dir}"/abyss_assembly.contig
+        fi
+        
+        if [ -f "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" ]; then
+            ((valid_assemblies++))
+            which_assemblies=(${which_assemblies[@]} ${output_dir}/edena_assembly.contig)
+            mv "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" "${output_dir}"/edena_assembly.contig
+        fi
+    #else
+    #    echo -e "MetAMOS assembly files already detected for sample, proceeding..."
+    #    echo -e "MetAMOS assembly files already detected for sample, proceeding..." >> WGS_LabNotebook.txt
+    #fi
     
-    
-    #if [ ! -f "${metamos}/${sample_name}"/Assemble/out/idba-ud
-    
-    
+    ## This note is for when we run into bugs with bad assemblies (and we will at some point):
+    ## Make sure this section is assigning variables correctly for best assembly
+    if [ "$valid_assemblies" == "0" ]; then
+        echo -e "Error: Zero valid assemblies detected.  Check error logs."
+        echo -e "Error: Zero valid assemblies detected.  Check error logs." >> WGS_LabNotebook.txt
+    elif [ "$valid_assemblies" -lt "3" ]; then
+        echo -e "Less than three valid assemblies detected, skipping CISA and continuing with annotation..."
+        echo $which_assemblies | sed 's/;/\n/g'
+        echo -e "Less than three valid assemblies detected, skipping CISA and continuing with annotation..." >> WGS_LabNotebook.txt
+        echo $which_assemblies | sed 's/;/\n/g' >> WGS_LabNotebook.txt
+        best_assembly=$( head -n 1 "${temp_dir}/${sample_name}/Postprocess/out/best.asm" | sed 's/\n//' | sed 's/\..*//' | sed 's/-ud$//' )
+        best_assembly="${output_dir}/${best_assembly}_assembly.contig"
+    else
+        ## Proceed with CISA config file creation
+        
+        echo -e "Creating CISA config files for ${spp_pipeline} organism..."
+        echo -e "Creating CISA config files for ${spp_pipeline} organism..." >> WGS_LabNotebook.txt
+        
+        if [ "${spp_pipeline}" == "Lmonocytogenes" ]; then
+            genome_size="2944528"
+        fi
+        
+        echo -e "count=${valid_assemblies}\n" >> "${temp_dir}/Merge.config"
+        for i in "${which_assemblies[@]}"; do
+            fullpath=$( readlink -f  "$i" )
+            assembler=$( grep -Po "(abyss|idba|velvet|spades|edena)" )
+            echo -e "data=${fullpath},title=${assembler}\n" >> "${temp_dir}/Merge.config"
+        done
+        echo -e "Master_file=${output_dir}/${sample_name}_merged_contigs.fa" >> "${temp_dir}/Merge.config"
+        
+        
+        echo -e "genome=${genome_size}\ninfile=${output_dir}/${sample_name}_merged_contigs.fa\noutfile=${output_dir}/${sample_name}_cisa_integrated.fa\n" >> "${temp_dir}/CISA.config"
+        echo -e "nucmer=${nucmer}\nR2_gap=0.95\nCISA=${cisa}\nmakeblastdb=${blastdb}\nblastn=${blastn}" >> "${temp_dir}/CISA.config"
+    fi
 }
 
 
@@ -192,6 +307,10 @@ while [[ "${1+defined}"  ]]; do
 	        ;;
 	    -s | --sample_name)
 	        sample_name=$2
+	        shift 2
+	        ;;
+	    -spp | --species)
+	        spp_pipeline=$2
 	        shift 2
 	        ;;
 	    -t | --threads)
@@ -240,9 +359,7 @@ bbmap_insert_size $forward $reverse
 
 ## Assemble using MetAmos: velvet, spades, idba, abyss
 imetamos_run
-if [ $? -ne 0 ]; then
-    echo "Kmer size is: $kmer"
-fi
+
 ## 
 
 
