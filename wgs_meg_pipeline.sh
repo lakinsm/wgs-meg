@@ -71,6 +71,7 @@ bcftools="/usr/bin/bcftools"
 vcfutils="/usr/share/samtools/vcfutils.pl"
 PERL5LIB="/s/angus/index/common/tools/vcftools/src/perl"
 tabix="/s/angus/index/common/tools/tabix"
+ksnp="/usr/local/kSNP3/kSNP3"
 Lmono="/s/angus/index/projs/listeria_wgs/mapping/genome_and_index/index/Listeria.fa"
 
 ## Paths to output directories
@@ -87,6 +88,7 @@ insert=0  # insert size as determined by bbmerge
 kmer=0  # k-mer size determined by specialk in metamos
 genome_size=0  # genome size for this particular organism
 treshold=25  # quality score threshold for the N_masking step in kSNP
+chosen_k=0  # k-value chosen by kchooser
 threads=1  # threads to use where applicable, recommend ~ 20
 
 
@@ -119,6 +121,8 @@ validate_paths() {
     VCFUtils:                 ${vcfutils}
     PERL5LIB:                 ${PERL5LIB}
     Tabix:                    ${tabix}
+    kSNP3:                    ${ksnp}
+    
     AMR Database:             ${amrdb}
     Virulence Database:       ${vfdb}
     Plasmid Database:         ${plasmiddb}
@@ -178,9 +182,9 @@ validate_paths() {
     	local missing="$missing:BCFTools;"
     fi
     
-    if [ ! -e "${vcfutils}" ]; then
-    	local missing="$missing:VCFUtils;"
-    fi
+#    if [ ! -e "${vcfutils}" ]; then
+#    	local missing="$missing:VCFUtils;"
+#    fi
     
     if [ ! -d "${PERL5LIB}" ]; then
     	local missing="$missing:PERL5LIB;"
@@ -188,6 +192,10 @@ validate_paths() {
     
     if [ ! -d "${tabix}" ]; then
     	local missing="$missing:TabixPath;"
+    fi
+    
+    if [ ! -e "${ksnp}" ]; then
+    	local missing="$missing:kSNP3;"
     fi
     
     if [ ! -e "${amrdb}" ]; then
@@ -482,18 +490,18 @@ choose_reference() {
 ref_align() {
     ## Align to the reference genome chosen in the previous steps
     ## We will use BWA mem here, since whole genome alignment is what it was designed to do
-    $bwa mem -t $threads "${refgenome}" $forward $reverse > ${temp_dir}/ref.sam
+    $bwa mem -t $threads "${refgenome}" ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/ref.sam
     $samtools view -hbS ${temp_dir}/ref.sam > ${temp_dir}/ref.bam
     $samtools sort ${temp_dir}/ref.bam ${output_dir}/${sample_name}_ref_sorted
     
     ## We also want to keep reads that are unmapped to reference
     ## To do this, we can use the filter_sam.py script with a filter threshold of 70bp read length
     ## since we don't want to keep short read fragments that are unlikely to be useful in BLAST
-    cat ${temp_dir}/ref.sam | python3 ${RELPATH}/filter_sam.py - 70 > ${output_dir}/${sample_name}_reads_unmapped_to_ref.fasta
+    cat ${temp_dir}/ref.sam | python3 ${RELPATH}/filter_sam.py - -l 70 > ${output_dir}/${sample_name}_reads_unmapped_to_ref.fasta
     
     ## Now we mpileup to create a consensus
     $samtools mpileup -uD -f ${refgenome} ${output_dir}/${sample_name}_ref_sorted.bam | $bcftools view -bvcg - > ${temp_dir}/ref_raw.bcf
-    $bcftools view ${temp_dir}/ref_raw.bcf | $vcfutils varFilter -D 150 | $bgzip -c | ${output_dir}/${sample_name}_ref_snps.vcf.gz
+    $bcftools view ${temp_dir}/ref_raw.bcf | $bgzip -c > ${output_dir}/${sample_name}_ref_snps.vcf.gz
     ${tabix}/tabix -p vcf ${output_dir}/${sample_name}_ref_snps.vcf.gz
     cat ${refgenome} | ${PERL5LIB}/vcf-consensus ${output_dir}/${sample_name}_ref_snps.vcf.gz > ${output_dir}/${sample_name}_consensus.fa
     consensus_file="${output_dir}/${sample_name}_consensus.fa"
@@ -501,8 +509,23 @@ ref_align() {
 
 
 n_mask() {
-    python3 ${RELPATH}/dna_threshold.py ${temp_dir}/1p.fastq $threshold > ${temp_dir}/1p_mask.fastq
-    python3 ${RELPATH}/dna_threshold.py ${temp_dir}/2p.fastq $threshold > ${temp_dir}/2p_mask.fastq
+	## For KChooser, we need to first mask low-quality bases with N and then concatenate the resulting files
+	## into a single FASTA
+    python3 ${RELPATH}/dna_threshold.py ${temp_dir}/1p.fastq $threshold > ${temp_dir}/masked_reads.fasta
+    python3 ${RELPATH}/dna_threshold.py ${temp_dir}/2p.fastq $threshold >> ${temp_dir}/masked_reads.fasta
+}
+
+
+ksnp_run() {
+	## kSNP3 generates a distance matrix and Phylip tree output
+	## We will store those outputs as well as turn the Phylip into strict Phylip for further use
+	if [ ! -d ${sample_name}_ksnp
+	    mkdir ${sample_name}_ksnp
+	fi
+	
+	chosen_k=19  # this is temporary while we debug kchooser
+	
+	$ksnp -in ${temp_dir}/ksnp.infile -outdir ${sample_name}_ksnp -k ${chosen_k}
 }
 
 
@@ -623,15 +646,15 @@ fi
 echo -e "Beginning Alignment pipeline..."
 echo -e "Beginning Alignment pipeline..." >> WGS_LabNotebook.txt
 ## Preprocess the reads
-trim_reads
+#trim_reads
 
 ## Align to the AMR database, VFDB, and Plasmid database
-amr_align
-vfdb_align
-plasmid_align
+#amr_align
+#vfdb_align
+#plasmid_align
 
 ## Pick the correct reference genome
-choose_reference
+#choose_reference
 
 ## Align to reference genome
 ref_align
@@ -644,26 +667,25 @@ else
     prokka_annotate "align_consensus" "${consensus_file}"
 fi
 
+echo -e "Alignment pipeline complete."
+echo -e "Alignment pipeline complete." >> WGS_LabNotebook.txt
+
+###################
+## kSNP Distance ##
+###################
+echo -e "Beginning kSNP pipeline..."
+echo -e "Beginning kSNP pipeline..." >> WGS_LabNotebook.txt
 ## Perform N-masking on the trimmed reads from the Trimmomatic step
 ## Pass these into the kSNP pipeline
 n_mask
 
+## Run KChooser (we're still figuring out the debugging on this, to be implemented later)
 
+## Run kSNP3
+ksnp_run
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+echo -e "kSNP pipeline complete."
+echo -e "kSNP pipeline complete." >> WGS_LabNotebook.txt
 
 
 exit 0
