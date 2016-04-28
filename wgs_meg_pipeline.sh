@@ -69,7 +69,7 @@ samratio="/s/angus/index/common/tools/samratio.jar"
 samtools="/usr/bin/samtools"
 bcftools="/usr/bin/bcftools"
 vcfutils="/usr/share/samtools/vcfutils.pl"
-PERL5LIB="PERL5LIB=/s/angus/index/common/tools/vcftools/src/perl"
+PERL5LIB="/s/angus/index/common/tools/vcftools/src/perl"
 tabix="/s/angus/index/common/tools/tabix"
 Lmono="/s/angus/index/projs/listeria_wgs/mapping/genome_and_index/index/Listeria.fa"
 
