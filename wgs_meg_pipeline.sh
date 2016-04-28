@@ -53,6 +53,7 @@ nucmer="/s/angus/index/common/tools/MUMmer3.23/nucmer"
 cisa="/s/angus/index/common/tools/CISA1.3"
 blastdb="/usr/bin/makeblastdb"
 blastn="/usr/bin/blastn"
+prokka="/s/angus/index/common/tools/prokka/prokka-1.11/bin/prokka"
 
 ## Paths to output directories
 temp_dir=""
@@ -88,6 +89,7 @@ validate_paths() {
     CISA:                     ${cisa}
     makeblastdb:              ${blastdb}
     blastn:                   ${blastn}
+    prokka:                   ${prokka}
 
     
     Directories selected:
@@ -118,6 +120,10 @@ validate_paths() {
     
     if [ ! -e "${blastn}" ]; then
     	local missing="$missing:blastn;"
+    fi
+    
+    if [ ! -e "${prokka}" ]; then
+    	local missing="$missing:prokka;"
     fi
     
     #--------------------------------
@@ -172,10 +178,11 @@ get_versions() {
 	echo -e "Software versions:" >> WGS_LabNotebook.txt
 	$bbmap | grep "^BBMerge" >> WGS_LabNotebook.txt
 	head -n 1 ${metamos}/README.md | grep -Po "MetAMOS.*\" " >> WGS_LabNotebook.txt
-	$nucmer -version | grep "NUCmer" >> WGS_LabNotebook.txt
+	$nucmer -version 3>&1 1>&2 2>&3 3>&- | grep "NUCmer" >> WGS_LabNotebook.txt
 	echo $cisa | grep -Po "CISA[0-9].[0-9]" >> WGS_LabNotebook.txt
 	$blastdb -version | head -n 1 >> WGS_LabNotebook.txt
 	$blastn -version | head -n 1 >> WGS_LabNotebook.txt
+	$prokka --version >> WGS_LabNotebook.txt
 }
 
 
@@ -284,6 +291,36 @@ imetamos_run() {
 }
 
 
+cisa_run() {
+    ## CISA takes the assemblies from iMetAMOS and integrates them into a single file
+    ## It then takes that file and computes a combined set of contigs if possible
+    $cisa/Merge.py "${temp_dir}/Merge.config"
+    $cisa/CISA.py "${temp_dir}/CISA.config"
+    best_assembly="${output_dir}/${sample_name}_cisa_integrated.fa"
+    
+    if [ ! -f "$best_assembly" ]; then
+        echo -e "CISA failed to produce the expected merged file.  Please check the logs."
+        echo -e "CISA failed to produce the expected merged file.  Please check the logs." >> WGS_LabNotebook.txt
+    fi
+}
+
+
+prokka_annotate() {
+    ## Prokka uses several methods to annotate the best assembly based on all known sources of information
+    ## We need to pass some genus/species specific information to Prokka for this to work correctly
+    ## so we need to detect the organism pipeline here
+    if [ "${spp_pipeline}" == "Lmonocytogenes" ]; then
+        genus="Listeria"
+        species="monocytogenes"
+    fi
+    
+    echo -e "Beginning annotation with prokka..."
+    
+    $prokka --genus $genus --species $species --usegenus --addgenes --cpus $threads --prefix ${sample_name} ${best_assembly}
+    
+}
+
+
 ##########
 ## Main ##
 ##########
@@ -360,7 +397,13 @@ bbmap_insert_size $forward $reverse
 ## Assemble using MetAmos: velvet, spades, idba, abyss
 imetamos_run
 
-## 
+## Merge contigs with CISA if applicable
+if [ "${best_assembly}" == "" ]; then
+    cisa_run
+fi
+
+## Annotate the best assembly, either CISA or the single best from MetAMOS
+prokka_annotate
 
 
 
