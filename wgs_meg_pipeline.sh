@@ -272,9 +272,8 @@ imetamos_run() {
         echo "${which_assemblies[@]}"
         echo -e "count=${valid_assemblies}\n" >> "${temp_dir}/Merge.config"
         for i in "${which_assemblies[@]}"; do
-            echo "$i"
             fullpath=$( readlink -f  "$i" )
-            assembler=$( grep -Po "(abyss|idba|velvet|spades|edena)" )
+            assembler=$( echo $i | grep -Po "(abyss|idba|velvet|spades|edena)" )
             echo -e "data=${fullpath},title=${assembler}\n" >> "${temp_dir}/Merge.config"
         done
         echo -e "Master_file=${output_dir}/${sample_name}_merged_contigs.fa" >> "${temp_dir}/Merge.config"
