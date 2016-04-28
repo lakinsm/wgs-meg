@@ -118,7 +118,7 @@ validate_paths() {
     BCFTools:                 ${bcftools}
     VCFUtils:                 ${vcfutils}
     PERL5LIB:                 ${PERL5LIB}
-    Taxix:                    ${tabix}
+    Tabix:                    ${tabix}
     AMR Database:             ${amrdb}
     Virulence Database:       ${vfdb}
     Plasmid Database:         ${plasmiddb}
@@ -272,7 +272,7 @@ bbmap_insert_size() {
 	## Check to make sure we succeeded
 	if [ "$insert" == "0" ]; then
 	    echo -e "Error: insert size detection with BBMerge failed, insert size is still zero."
-	    echo -e "Error: insert size detection with BBMerge failed, insert size is still zero." >> WGS_LabNotebook.txt
+	    echo -e "\tError: insert size detection with BBMerge failed, insert size is still zero." >> WGS_LabNotebook.txt
 	    exit 1
 	fi
 }
@@ -285,8 +285,8 @@ imetamos_run() {
     ## format to run with CISA.
     ## Note that this function utilizes global variables.
 
-    echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..."
-    echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..." >> WGS_LabNotebook.txt
+    echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, abyss, and edena..."
+    echo -e "\tBeginning MetAMOS assembly using idba-ud, velvet, spades, abyss, and edena..." >> WGS_LabNotebook.txt
     "${metamos}"/initPipeline -q -1 $forward -2 $reverse -d "${temp_dir}/${sample_name}" -i $insert -W iMetAMOS
     kmer=$( "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss,edena -b -z genus -d "${temp_dir}/${sample_name}" | grep "Selected kmer size" | grep -Po "[0-9]{1,4}" )
     
@@ -327,11 +327,11 @@ imetamos_run() {
     ## Make sure this section is assigning variables correctly for best assembly
     if [ "$valid_assemblies" == "0" ]; then
         echo -e "Error: Zero valid assemblies detected.  Check error logs."
-        echo -e "Error: Zero valid assemblies detected.  Check error logs." >> WGS_LabNotebook.txt
+        echo -e "\tError: Zero valid assemblies detected.  Check error logs." >> WGS_LabNotebook.txt
     elif [ "$valid_assemblies" -lt "3" ]; then
         echo -e "Less than three valid assemblies detected, skipping CISA and continuing with annotation..."
         echo $which_assemblies | sed 's/;/\n/g'
-        echo -e "Less than three valid assemblies detected, skipping CISA and continuing with annotation..." >> WGS_LabNotebook.txt
+        echo -e "\tLess than three valid assemblies detected, skipping CISA and continuing with annotation..." >> WGS_LabNotebook.txt
         echo $which_assemblies | sed 's/;/\n/g' >> WGS_LabNotebook.txt
         best_assembly=$( head -n 1 "${temp_dir}/${sample_name}/Postprocess/out/best.asm" | sed 's/\n//' | sed 's/\..*//' | sed 's/-ud$//' )
         best_assembly="${output_dir}/${best_assembly}_assembly.contig"
@@ -339,7 +339,7 @@ imetamos_run() {
         ## Proceed with CISA config file creation
         
         echo -e "Creating CISA config files for ${spp_pipeline} organism..."
-        echo -e "Creating CISA config files for ${spp_pipeline} organism..." >> WGS_LabNotebook.txt
+        echo -e "\tCreating CISA config files for ${spp_pipeline} organism..." >> WGS_LabNotebook.txt
         
         if [ "${spp_pipeline}" == "Lmonocytogenes" ]; then
             genome_size="2944528"
@@ -365,13 +365,16 @@ imetamos_run() {
 cisa_run() {
     ## CISA takes the assemblies from iMetAMOS and integrates them into a single file
     ## It then takes that file and computes a combined set of contigs if possible
+    echo -e "Running CISA for contig integration..."
+    echo -e "\tRunning CISA for contig integration..." >> WGS_LabNotebook.txt
+    
     $cisa/Merge.py "${temp_dir}/Merge.config"
     echo "y" | $cisa/CISA.py "${temp_dir}/CISA.config"
     best_assembly="${output_dir}/${sample_name}_cisa_integrated.fa"
     
     if [ ! -f "$best_assembly" ]; then
         echo -e "CISA failed to produce the expected merged file.  Please check the logs."
-        echo -e "CISA failed to produce the expected merged file.  Please check the logs." >> WGS_LabNotebook.txt
+        echo -e "\tCISA failed to produce the expected merged file.  Please check the logs." >> WGS_LabNotebook.txt
     fi
     
     for i in ${output_dir}/*; do
@@ -398,6 +401,7 @@ prokka_annotate() {
     fi
     
     echo -e "Beginning annotation with prokka..."
+    echo -e "\tBeginning annotation with prokka..." >> WGS_LabNotebook.txt
     
     $prokka --genus $genus --species $species --usegenus --addgenes --cpus $threads --prefix "${sample_name}_prokka_${1}" $2
     
@@ -407,11 +411,11 @@ prokka_annotate() {
 trim_reads() {
     if [ ! -f "${temp_dir}/1p.fastq" ] || [ ! -f "${temp_dir}/2p.fastq" ]; then
         echo -e "Beginning read trimming..."
-        echo -e "Beginning read trimming..." >> WGS_LabNotebook.txt
+        echo -e "\tBeginning read trimming..." >> WGS_LabNotebook.txt
         java -jar "${trimmomatic}/trimmomatic-0.32.jar" PE -threads $threads -phred33 $forward $reverse "${temp_dir}/1p.fastq" "${temp_dir}/1u.fastq" "${temp_dir}/2p.fastq" "${temp_dir}/2u.fastq" ILLUMINACLIP:"${trimmomatic}/adapters/TruSeq3-PE.fa:2:30:10:3:TRUE" LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
     else
         echo -e "Trimmed reads already detected, proceeding with alignments..."
-        echo -e "Trimmed reads already detected, proceeding with alignments..." >> WGS_LabNotebook.txt
+        echo -e "\tTrimmed reads already detected, proceeding with alignments..." >> WGS_LabNotebook.txt
     fi
 }
 
@@ -419,16 +423,16 @@ trim_reads() {
 amr_align() {
     if [ ! -f "${output_dir}/${sample_name}_amr_parsed.csv" ]; then
         echo -e "Aligning to AMR database..."
-        echo -e "Aligning to AMR database..." >> WGS_LabNotebook.txt
+        echo -e "\tAligning to AMR database..." >> WGS_LabNotebook.txt
         $bwa aln ${amrdb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
         $bwa aln ${amrdb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
         $bwa sampe -n 1000 -N 1000 ${amrdb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/amr.sam
         java -jar ${samratio} -d ${amrdb} -i ${temp_dir}/amr.sam -t 1 -o "${output_dir}/${sample_name}_amr_parsed.csv"
         
-        
+        rm ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/amr.sam
     else
         echo -e "AMR parsed file detected, proceeding..."
-        echo -e "AMR parsed file detected, proceeding..." >> WGS_LabNotebook.txt
+        echo -e "\tAMR parsed file detected, proceeding..." >> WGS_LabNotebook.txt
     fi
 }
 
@@ -436,16 +440,16 @@ amr_align() {
 vfdb_align() {
     if [ ! -f "${output_dir}/${sample_name}_vfdb_parsed.csv" ]; then
         echo -e "Aligning to Virulence database..."
-        echo -e "Aligning to Virulence database..." >> WGS_LabNotebook.txt
+        echo -e "\tAligning to Virulence database..." >> WGS_LabNotebook.txt
         $bwa aln ${vfdb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
         $bwa aln ${vfdb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
         $bwa sampe -n 1000 -N 1000 ${vfdb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/vfdb.sam
         java -jar ${samratio} -d ${vfdb} -i ${temp_dir}/vfdb.sam -t 1 -o "${output_dir}/${sample_name}_vfdb_parsed.csv"
         
-        rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/vfdb.sam
+        rm ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/vfdb.sam
     else
         echo -e "VFDB parsed file detected, proceeding..."
-        echo -e "VFDB parsed file detected, proceeding..." >> WGS_LabNotebook.txt
+        echo -e "\tVFDB parsed file detected, proceeding..." >> WGS_LabNotebook.txt
     fi
 }
 
@@ -453,16 +457,16 @@ vfdb_align() {
 plasmid_align() {
     if [ ! -f "${output_dir}/${sample_name}_plasmid_parsed.csv" ]; then
         echo -e "Aligning to Plasmid database..."
-        echo -e "Aligning to Plasmid database..." >> WGS_LabNotebook.txt
+        echo -e "\tAligning to Plasmid database..." >> WGS_LabNotebook.txt
         $bwa aln ${plasmiddb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
         $bwa aln ${plasmiddb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
         $bwa sampe -n 1000 -N 1000 ${plasmiddb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/plasmid.sam
         java -jar ${samratio} -d ${plasmiddb} -i ${temp_dir}/plasmid.sam -t 1 -o "${output_dir}/${sample_name}_plasmid_parsed.csv"
         
-        rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/plasmid.sam
+        rm ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/plasmid.sam
     else
         echo -e "Plasmid parsed file detected, proceeding..."
-        echo -e "Plasmid parsed file detected, proceeding..." >> WGS_LabNotebook.txt
+        echo -e "\tPlasmid parsed file detected, proceeding..." >> WGS_LabNotebook.txt
     fi
 }
 
@@ -503,7 +507,7 @@ n_mask() {
 
 
 cleanup() {
-    rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1u.fastq ${temp_dir}/2u.fastq ${temp_dir}/amr.sam
+    rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/1u.fastq ${temp_dir}/2u.fastq ${temp_dir}/amr.sam
     echo "Files cleaned up.  Temporary directory ${temp_dir} can optionally be deleted by the user."
 }
 
@@ -586,6 +590,8 @@ validate_inputs $forward $reverse
 ##############
 ## Assembly ##
 ##############
+echo -e "Beginning Assembly pipeline..."
+echo -e "Beginning Assembly pipeline..." >> WGS_LabNotebook.txt
 if [ "${run_assembly}" == "1" ]; then
     ## Find average insert size with BBMerge from BBMap
     bbmap_insert_size $forward $reverse
@@ -601,7 +607,7 @@ if [ "${run_assembly}" == "1" ]; then
     ## Truncate headers of best assembly for prokka
     mv "${best_assembly}" "${best_assembly}_temp"
     python3 ${RELPATH}/truncate_headers.py "${best_assembly}_temp" > "${best_assembly}"
-    #rm "${best_assembly}_temp"
+    rm "${best_assembly}_temp"
 
     ## Annotate the best assembly, either CISA or the single best from MetAMOS
     prokka_annotate "assembly" "${best_assembly}"
@@ -614,6 +620,8 @@ fi
 ###############
 ## Alignment ##
 ###############
+echo -e "Beginning Alignment pipeline..."
+echo -e "Beginning Alignment pipeline..." >> WGS_LabNotebook.txt
 ## Preprocess the reads
 trim_reads
 
@@ -631,7 +639,7 @@ ref_align
 ## Annotate the consensus file created in the reference alignment step
 if [ "${consensus_file}" == "" ]; then
     echo -e "Consensus file creation failed; check the logs."
-    echo -e "Consensus file creation failed; check the logs." >> WGS_LabNotebook.txt
+    echo -e "\tConsensus file creation failed; check the logs." >> WGS_LabNotebook.txt
 else
     prokka_annotate "align_consensus" "${consensus_file}"
 fi
