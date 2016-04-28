@@ -18,6 +18,8 @@ if [ ! "$BASH_VERSION" ] ; then
     exit 1
 fi
 
+RELPATH="${BASH_SOURCE%/*}"
+
 shopt -s extglob
 
 
@@ -41,6 +43,7 @@ display_help () {
         -spp| --species STR         Species identifier string (see documentation for details)
         -t | --threads  INT         Threads to use where applicable
         -td| --temp_dir DIR         Temporary directory for intermediate dirs/files
+        -T | --threshold INT        Quality score threshold for N-masking in kSNP pipeline
 
 "
 }
@@ -63,7 +66,12 @@ amrdb="/s/angus/index/databases/resistance_databases/databases/meta-marc/src/mma
 vfdb="/s/angus/index/databases/bwa_indexes/VFDB/New_VFDB_4_4_2016/VFDB_setA_nt_4_4_2016.fas"
 plasmiddb="/s/angus/index/databases/plasmid/all_plasmid_seqs.fasta"
 samratio="/s/angus/index/common/tools/samratio.jar"
-Lmono="/s/angus/index/projs/listeria_wgs/genomes_and_annotations/LM_annotations/LM_Refseq"
+samtools="/usr/bin/samtools"
+bcftools="/usr/bin/bcftools"
+vcfutils="/usr/share/samtools/vcfutils.pl"
+PERL5LIB="PERL5LIB=/s/angus/index/common/tools/vcftools/src/perl"
+tabix="/s/angus/index/common/tools/tabix"
+Lmono="/s/angus/index/projs/listeria_wgs/mapping/genome_and_index/index/Listeria.fa"
 
 ## Paths to output directories
 temp_dir=""
@@ -74,9 +82,11 @@ sample_name=""
 spp_pipeline="Lmonocytogenes"
 run_assembly=0
 best_assembly=""  # used in the event of less than 3 assemblies from metamos
+consensus_file=""  # used to verify that a proper consensus was created
 insert=0  # insert size as determined by bbmerge
 kmer=0  # k-mer size determined by specialk in metamos
 genome_size=0  # genome size for this particular organism
+treshold=25  # quality score threshold for the N_masking step in kSNP
 threads=1  # threads to use where applicable, recommend ~ 20
 
 
@@ -104,6 +114,11 @@ validate_paths() {
     Trimmomatic:              ${trimmomatic}
     BWA:                      ${bwa}
     SamRatio:                 ${samratio}
+    SAMTools:                 ${samtools}
+    BCFTools:                 ${bcftools}
+    VCFUtils:                 ${vcfutils}
+    PERL5LIB:                 ${PERL5LIB}
+    Taxix:                    ${tabix}
     AMR Database:             ${amrdb}
     Virulence Database:       ${vfdb}
     Plasmid Database:         ${plasmiddb}
@@ -155,6 +170,26 @@ validate_paths() {
     	local missing="$missing:SamRatio;"
     fi
     
+    if [ ! -e "${samtools}" ]; then
+    	local missing="$missing:SAMTools;"
+    fi
+    
+    if [ ! -e "${bcftools}" ]; then
+    	local missing="$missing:BCFTools;"
+    fi
+    
+    if [ ! -e "${vcfutils}" ]; then
+    	local missing="$missing:VCFUtils;"
+    fi
+    
+    if [ ! -d "${PERL5LIB}" ]; then
+    	local missing="$missing:PERL5LIB;"
+    fi
+    
+    if [ ! -d "${tabix}" ]; then
+    	local missing="$missing:TabixPath;"
+    fi
+    
     if [ ! -e "${amrdb}" ]; then
     	local missing="$missing:AMRDatabase;"
     fi
@@ -193,6 +228,7 @@ validate_paths() {
         echo -e $missing | sed 's/;/\n/g'
         exit 1
     else
+        bgzip="${tabix}/bgzip"
         echo -e "\nPaths and Directories are valid. Proceeding..."
     fi
 }
@@ -224,14 +260,7 @@ get_versions() {
 	$blastdb -version | head -n 1 >> WGS_LabNotebook.txt
 	$blastn -version | head -n 1 >> WGS_LabNotebook.txt
 	$prokka --version 3>&1 1>&2 2>&3 3>&- >> WGS_LabNotebook.txt
-}
-
-
-choose_reference() {
-    ## Pick the appropriate reference based on the input species
-    if [ "${spp_pipeline}" == "Lmonocytogenes" ]; then
-        refgenome="${Lmono}"
-    fi
+	$samtools 3>&1 1>&2 2>&3 3>&- | grep "Version" | sed 's/^/SamTools /' >> WGS_LabNotebook.txt
 }
 
 
@@ -260,8 +289,6 @@ imetamos_run() {
     echo -e "Beginning MetAMOS assembly using idba-ud, velvet, spades, and abyss..." >> WGS_LabNotebook.txt
     "${metamos}"/initPipeline -q -1 $forward -2 $reverse -d "${temp_dir}/${sample_name}" -i $insert -W iMetAMOS
     kmer=$( "${metamos}"/runPipeline -p $threads -t eautils -q -a velvet,spades,idba-ud,abyss,edena -b -z genus -d "${temp_dir}/${sample_name}" | grep "Selected kmer size" | grep -Po "[0-9]{1,4}" )
-    
-    echo "Kmer test: $kmer" >> kmer_test.txt  # debugging
     
     valid_assemblies=0
     which_assemblies=()
@@ -372,7 +399,7 @@ prokka_annotate() {
     
     echo -e "Beginning annotation with prokka..."
     
-    $prokka --genus $genus --species $species --usegenus --addgenes --cpus $threads --prefix "${sample_name}_prokka_${1}" ${best_assembly}
+    $prokka --genus $genus --species $species --usegenus --addgenes --cpus $threads --prefix "${sample_name}_prokka_${1}" $2
     
 }
 
@@ -398,7 +425,7 @@ amr_align() {
         $bwa sampe -n 1000 -N 1000 ${amrdb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/amr.sam
         java -jar ${samratio} -d ${amrdb} -i ${temp_dir}/amr.sam -t 1 -o "${output_dir}/${sample_name}_amr_parsed.csv"
         
-        rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/amr.sam
+        
     else
         echo -e "AMR parsed file detected, proceeding..."
         echo -e "AMR parsed file detected, proceeding..." >> WGS_LabNotebook.txt
@@ -440,10 +467,44 @@ plasmid_align() {
 }
 
 
+choose_reference() {
+    ## Pick the appropriate reference based on the input species
+    if [ "${spp_pipeline}" == "Lmonocytogenes" ]; then
+        refgenome="${Lmono}"
+    fi
+}
+
+
 ref_align() {
     ## Align to the reference genome chosen in the previous steps
     ## We will use BWA mem here, since whole genome alignment is what it was designed to do
-    bwa mem -t $threads "${refgenome}" $forward $reverse > ${temp_dir}/ref.sam
+    $bwa mem -t $threads "${refgenome}" $forward $reverse > ${temp_dir}/ref.sam
+    $samtools view -hbS ${temp_dir}/ref.sam > ${temp_dir}/ref.bam
+    $samtools sort ${temp_dir}/ref.bam ${output_dir}/${sample_name}_ref_sorted
+    
+    ## We also want to keep reads that are unmapped to reference
+    ## To do this, we can use the filter_sam.py script with a filter threshold of 70bp read length
+    ## since we don't want to keep short read fragments that are unlikely to be useful in BLAST
+    cat ${temp_dir}/ref.sam | python3 ${RELPATH}/filter_sam.py - 70 > ${output_dir}/${sample_name}_reads_unmapped_to_ref.fasta
+    
+    ## Now we mpileup to create a consensus
+    $samtools mpileup -uD -f ${refgenome} ${output_dir}/${sample_name}_ref_sorted.bam | $bcftools view -bvcg - > ${temp_dir}/ref_raw.bcf
+    $bcftools view ${temp_dir}/ref_raw.bcf | $vcfutils varFilter -D 150 | $bgzip -c | ${output_dir}/${sample_name}_ref_snps.vcf.gz
+    ${tabix}/tabix -p vcf ${output_dir}/${sample_name}_ref_snps.vcf.gz
+    cat ${refgenome} | ${PERL5LIB}/vcf-consensus ${output_dir}/${sample_name}_ref_snps.vcf.gz > ${output_dir}/${sample_name}_consensus.fa
+    consensus_file="${output_dir}/${sample_name}_consensus.fa"
+}
+
+
+n_mask() {
+    python3 ${RELPATH}/dna_threshold.py ${temp_dir}/1p.fastq $threshold > ${temp_dir}/1p_mask.fastq
+    python3 ${RELPATH}/dna_threshold.py ${temp_dir}/2p.fastq $threshold > ${temp_dir}/2p_mask.fastq
+}
+
+
+cleanup() {
+    rm ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1u.fastq ${temp_dir}/2u.fastq ${temp_dir}/amr.sam
+    echo "Files cleaned up.  Temporary directory ${temp_dir} can optionally be deleted by the user."
 }
 
 
@@ -488,6 +549,10 @@ while [[ "${1+defined}"  ]]; do
 	   		temp_dir=$2
 	   		shift 2
 	   		;;
+	    -T | --threshold)
+	        threshold=$2
+	        shift 2
+	        ;;
         --) #End of options
             shift 1
             break
@@ -535,11 +600,11 @@ if [ "${run_assembly}" == "1" ]; then
     
     ## Truncate headers of best assembly for prokka
     mv "${best_assembly}" "${best_assembly}_temp"
-    python3 ./truncate_headers.py "${best_assembly}_temp" > "${best_assembly}"
-    rm "${best_assembly}_temp"
+    python3 ${RELPATH}/truncate_headers.py "${best_assembly}_temp" > "${best_assembly}"
+    #rm "${best_assembly}_temp"
 
     ## Annotate the best assembly, either CISA or the single best from MetAMOS
-    prokka_annotate "assembly"
+    prokka_annotate "assembly" "${best_assembly}"
     
     echo -e "Assembly pipeline complete."
     echo -e "Assembly pipeline complete." >> WGS_LabNotebook.txt
@@ -562,6 +627,18 @@ choose_reference
 
 ## Align to reference genome
 ref_align
+
+## Annotate the consensus file created in the reference alignment step
+if [ "${consensus_file}" == "" ]; then
+    echo -e "Consensus file creation failed; check the logs."
+    echo -e "Consensus file creation failed; check the logs." >> WGS_LabNotebook.txt
+else
+    prokka_annotate "align_consensus" "${consensus_file}"
+fi
+
+## Perform N-masking on the trimmed reads from the Trimmomatic step
+## Pass these into the kSNP pipeline
+n_mask
 
 
 
