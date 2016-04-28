@@ -295,7 +295,7 @@ cisa_run() {
     ## CISA takes the assemblies from iMetAMOS and integrates them into a single file
     ## It then takes that file and computes a combined set of contigs if possible
     $cisa/Merge.py "${temp_dir}/Merge.config"
-    $cisa/CISA.py "${temp_dir}/CISA.config"
+    echo "y" | $cisa/CISA.py "${temp_dir}/CISA.config"
     best_assembly="${output_dir}/${sample_name}_cisa_integrated.fa"
     
     if [ ! -f "$best_assembly" ]; then
