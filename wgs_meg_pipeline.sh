@@ -216,31 +216,31 @@ imetamos_run() {
         if [ -f "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" ]; then
             ((valid_assemblies++))
             which_assemblies=(${which_assemblies[@]} ${output_dir}/idba_assembly.contig)
-            mv "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" "${output_dir}"/idba_assembly.contig
+            cp "${temp_dir}/${sample_name}/Assemble/out/idba-ud.${kmer}.seq100.contig" "${output_dir}"/idba_assembly.contig
         fi
         
         if [ -f "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" ]; then
             ((valid_assemblies++))
             which_assemblies=(${which_assemblies[@]} ${output_dir}/spades_assembly.contig)
-            mv "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" "${output_dir}"/spades_assembly.contig
+            cp "${temp_dir}/${sample_name}/Assemble/out/spades.${kmer}.seq100.contig" "${output_dir}"/spades_assembly.contig
         fi
         
         if [ -f "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" ]; then
             ((valid_assemblies++))
             which_assemblies=(${which_assemblies[@]} ${output_dir}/velvet_assembly.contig)
-            mv "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" "${output_dir}"/velvet_assembly.contig
+            cp "${temp_dir}/${sample_name}/Assemble/out/velvet.${kmer}.seq100.contig" "${output_dir}"/velvet_assembly.contig
         fi
         
         if [ -f "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" ]; then
             ((valid_assemblies++))
             which_assemblies=(${which_assemblies[@]} ${output_dir}/abyss_assembly.contig)
-            mv "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" "${output_dir}"/abyss_assembly.contig
+            cp "${temp_dir}/${sample_name}/Assemble/out/abyss.${kmer}.seq100.contig" "${output_dir}"/abyss_assembly.contig
         fi
         
         if [ -f "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" ]; then
             ((valid_assemblies++))
             which_assemblies=(${which_assemblies[@]} ${output_dir}/edena_assembly.contig)
-            mv "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" "${output_dir}"/edena_assembly.contig
+            cp "${temp_dir}/${sample_name}/Assemble/out/edena.${kmer}.seq100.contig" "${output_dir}"/edena_assembly.contig
         fi
     #else
     #    echo -e "MetAMOS assembly files already detected for sample, proceeding..."
