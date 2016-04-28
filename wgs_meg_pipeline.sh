@@ -172,7 +172,7 @@ get_versions() {
 	echo -e "Software versions:" >> WGS_LabNotebook.txt
 	$bbmap | grep "^BBMerge" >> WGS_LabNotebook.txt
 	head -n 1 ${metamos}/README.md | grep -Po "MetAMOS.*\" " >> WGS_LabNotebook.txt
-	$nucmer | grep "NUCmer" >> WGS_LabNotebook.txt
+	$nucmer -version | grep "NUCmer" >> WGS_LabNotebook.txt
 	echo $cisa | grep -Po "CISA[0-9].[0-9]" >> WGS_LabNotebook.txt
 	$blastdb -version | head -n 1 >> WGS_LabNotebook.txt
 	$blastn -version | head -n 1 >> WGS_LabNotebook.txt
@@ -269,8 +269,10 @@ imetamos_run() {
             genome_size="2944528"
         fi
         
+        echo "${which_assemblies[@]}"
         echo -e "count=${valid_assemblies}\n" >> "${temp_dir}/Merge.config"
         for i in "${which_assemblies[@]}"; do
+            echo "$i"
             fullpath=$( readlink -f  "$i" )
             assembler=$( grep -Po "(abyss|idba|velvet|spades|edena)" )
             echo -e "data=${fullpath},title=${assembler}\n" >> "${temp_dir}/Merge.config"
