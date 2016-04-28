@@ -182,7 +182,7 @@ get_versions() {
 	echo $cisa | grep -Po "CISA[0-9].[0-9]" >> WGS_LabNotebook.txt
 	$blastdb -version | head -n 1 >> WGS_LabNotebook.txt
 	$blastn -version | head -n 1 >> WGS_LabNotebook.txt
-	$prokka --version >> WGS_LabNotebook.txt
+	$prokka --version 3>&1 1>&2 2>&3 3>&- >> WGS_LabNotebook.txt
 }
 
 
@@ -316,7 +316,7 @@ prokka_annotate() {
     
     echo -e "Beginning annotation with prokka..."
     
-    $prokka --genus $genus --species $species --usegenus --addgenes --cpus $threads --prefix ${sample_name} ${best_assembly}
+    $prokka --genus $genus --species $species --usegenus --addgenes --cpus $threads --prefix "${sample_name}_prokka" ${best_assembly}
     
 }
 
