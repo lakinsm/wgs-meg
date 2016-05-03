@@ -120,12 +120,19 @@ pos=$(( ${#forwardfiles[*]} - 1 ))
 for i in `seq 0 $pos`; do
 	forfile="${forwardfiles[$i]}"
 	revfile=$( echo "$forfile" | sed 's/_R1_/_R2_/' )
-	sample_name=$( basename "$forfile" | sed 's/_R1_*.fastq//' )
+	sample_name=$( basename $forfile | sed -E 's/_R1_.+\.fastq//' )
 	if [ "$i" == "$pos" ]; then
-		#echo "last"
-		echo -e "${sample_name}\t${forfile}\t${revfile}"
+	    if [ "${run_assembly}" == "1" ]; then
+		{ time ${RELPATH}/wgs_meg_pipeline.sh -1 ${forfile} -2 ${revfile} -a -l -s ${sample_name} -spp ${spp_pipeline} -t ${threads} -td ${temp_dir} -T ${threshold} -o ${output_dir} ; } 2> WGS_timing_file.txt
+	    else
+		{ time ${RELPATH}/wgs_meg_pipeline.sh -1 ${forfile} -2 ${revfile} -l -s ${sample_name} -spp ${spp_pipeline} -t ${threads} -td ${temp_dir} -T ${threshold} -o ${output_dir} ; } 2> WGS_timing_file.txt
+	    fi
 	else
-		echo -e "${sample_name}\t${forfile}\t${revfile}"
+	    if [ "${run_assembly}" == "1" ]; then
+                { time ${RELPATH}/wgs_meg_pipeline.sh -1 ${forfile} -2 ${revfile} -a -s ${sample_name} -spp ${spp_pipeline} -t ${threads} -td ${temp_dir} -T ${threshold} -o ${output_dir} ; } 2> WGS_timing_file.txt
+            else
+                { time ${RELPATH}/wgs_meg_pipeline.sh -1 ${forfile} -2 ${revfile} -s ${sample_name} -spp ${spp_pipeline} -t ${threads} -td ${temp_dir} -T ${threshold} -o ${output_dir} ; } 2> WGS_timing_file.txt
+            fi
 	fi
 done
 
