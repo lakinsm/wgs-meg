@@ -661,9 +661,10 @@ validate_inputs $forward $reverse
 ##############
 ## Assembly ##
 ##############
-echo -e "Beginning Assembly pipeline..."
-echo -e "Beginning Assembly pipeline..." >> WGS_LabNotebook.txt
 if [ "${run_assembly}" == "1" ]; then
+    echo -e "Beginning Assembly pipeline..."
+    echo -e "Beginning Assembly pipeline..." >> WGS_LabNotebook.txt
+    
     ## Find average insert size with BBMerge from BBMap
     bbmap_insert_size $forward $reverse
 
