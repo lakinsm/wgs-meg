@@ -114,16 +114,15 @@ done
 
 declare -a files
 files=($indir/*)
-files=${files//R2*/}
-pos=$(( ${#files[*]} - 1 ))
-pos=$(( $pos / 2 ))
+forwardfiles=(`echo ${files[@]} | sed 's/ /\n/g' | grep "_R1_"`)
+pos=$(( ${#forwardfiles[*]} - 1 ))
 
 for i in `seq 0 $pos`; do
 	if [ "$i" == "$pos" ]; then
 		#echo "last"
-		echo "${files[$i]}"
+		echo "${forwardfiles[$i]}"
 	else
-		echo "${files[$i]}"
+		echo "${forwardfiles[$i]}"
 	fi
 done
 
