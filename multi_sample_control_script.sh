@@ -114,11 +114,14 @@ done
 
 declare -a files
 files=($indir/*)
+files=${files//R2*/}
 pos=$(( ${#files[*]} - 1 ))
+pos=$(( $pos / 2 ))
 
 for i in `seq 0 $pos`; do
 	if [ "$i" == "$pos" ]; then
-		echo "last"
+		#echo "last"
+		echo "${files[$i]}"
 	else
 		echo "${files[$i]}"
 	fi
