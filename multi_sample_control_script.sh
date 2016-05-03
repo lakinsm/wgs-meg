@@ -118,11 +118,14 @@ forwardfiles=(`echo ${files[@]} | sed 's/ /\n/g' | grep "_R1_"`)
 pos=$(( ${#forwardfiles[*]} - 1 ))
 
 for i in `seq 0 $pos`; do
+	forfile="${forwardfiles[$i]}"
+	revfile=$( echo "$forfile" | sed 's/_R1_/_R2_/' )
+	sample_name=$( basename "$forfile" | sed 's/_R1_*.fastq//' )
 	if [ "$i" == "$pos" ]; then
 		#echo "last"
-		echo "${forwardfiles[$i]}"
+		echo -e "${sample_name}\t${forfile}\t${revfile}"
 	else
-		echo "${forwardfiles[$i]}"
+		echo -e "${sample_name}\t${forfile}\t${revfile}"
 	fi
 done
 
