@@ -113,7 +113,7 @@ while [[ "${1+defined}"  ]]; do
 done
 
 declare -a files
-files=($input/*)
+files=($indir/*)
 pos=$(( ${#files[*]} - 1 ))
 
 for i in `seq 0 $pos`; do
