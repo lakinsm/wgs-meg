@@ -117,7 +117,11 @@ files=($indir/*)
 pos=$(( ${#files[*]} - 1 ))
 
 for i in `seq 0 $pos`; do
-	echo "${files[$i]}"
+	if [ "$i" == "$pos" ]; then
+		echo "last"
+	else
+		echo "${files[$i]}"
+	fi
 done
 
 
