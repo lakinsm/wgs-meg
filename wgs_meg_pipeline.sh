@@ -38,6 +38,7 @@ display_help () {
         -1 | --i1   FILE            Forward input fastq file
         -2 | --i2   FILE            Reverse input fastq file
         -a | --assembly             Flag: run assembly pipeline on this sample (slower)
+        -l | --last                 Flag: is this the last sample? If so, run kSNP
         -o | --output DIR           Directory for output of important files (main output dir)
         -s | --sample_name  STR     Main file name for this sample throughout the pipeline
         -spp| --species STR         Species identifier string (see documentation for details)
@@ -72,6 +73,8 @@ vcfutils="/usr/share/samtools/vcfutils.pl"
 PERL5LIB="/s/angus/index/common/tools/vcftools/src/perl"
 tabix="/s/angus/index/common/tools/tabix"
 ksnp="/usr/local/kSNP3/kSNP3"
+ksnp_repo="/s/angus/index/databases/ksnp_repository"
+integration_limbo="/s/angus/index/databases/ksnp_repository/awaiting_integration"
 Lmono="/s/angus/index/projs/listeria_wgs/mapping/genome_and_index/index/Listeria.fa"
 
 ## Paths to output directories
@@ -89,6 +92,7 @@ kmer=0  # k-mer size determined by specialk in metamos
 genome_size=0  # genome size for this particular organism
 treshold=25  # quality score threshold for the N_masking step in kSNP
 chosen_k=0  # k-value chosen by kchooser
+last_sample=0  # is this the last sample in the pipline?
 threads=1  # threads to use where applicable, recommend ~ 20
 
 
@@ -131,6 +135,8 @@ validate_paths() {
     Directories selected:
     Temporary directory:      ${temp_dir}
     Output directory:         ${output_dir}
+    kSNP repository:          ${ksnp_repo}
+    kSNP integration dir:     ${integration_limbo}
    	
    	" >> WGS_LabNotebook.txt
    	
@@ -229,6 +235,14 @@ validate_paths() {
     if [ ! -d "${output_dir}" ]; then
         local missing="$missing:OutputDirectory;"
     fi
+
+#    if [ ! -d "${ksnp_repo}" ]; then
+#	local missing="$missing:kSNPRepository"
+#    fi
+#
+#    if [ ! -d "${integration_limbo}" ]; then
+#        local missing="$missing:kSNPLimboDirectory"
+#    fi
     
     ## Check if components are missing
     if [ ! -e $missing ]; then
@@ -516,18 +530,46 @@ n_mask() {
 }
 
 
-ksnp_run() {
+ksnp_build() {
 	## kSNP3 generates a distance matrix and Phylip tree output
 	## We will store those outputs as well as turn the Phylip into strict Phylip for further use
 	if [ ! -d ${sample_name}_ksnp ]; then
 	    mkdir ${sample_name}_ksnp
 	fi
 	
-	chosen_k=19  # this is temporary while we debug kchooser
-	
 	## Need to make KSNP input file here, but we need to agree on our method for this first
+	if [ ! -d "$ksnp_repo" ]; then
+	    mkdir "$ksnp_repo"
+        fi
+	if [ ! -d "$integration_limbo" ]; then
+	    mkdir "$integration_limbo"
+	fi
+        ## The above ksnp_repo is hardcoded into this script.  This is intentional, as that directory
+	## should be a read-only repository of the fasta files we have collected and n_masked to date.
+	## Likewise, the "integration_repo" is a location where, after the pipeline has been run, new
+	## genomes are concatenated to the old list and await approval before final integration into
+	## the master genome list.  This pipeline will, for every run, copy THE MASTER FILE ONLY,
+	## and it will append all of the current genomes being run and output that file to limbo.
+	## Integration into the master file must be done using a separate script or manually.
+	## DO THIS BETWEEN PIPELINE RUNS; the above precautions are to prevent destruction of all
+	## previous work.
+	mv "${temp_dir}/masked_reads.fasta" "${ksnp_repo}/${sample_name}.fasta"
+	fullpath=$( readlink -f "${ksnp_repo}/${sample_name}.fasta" )
+	if [ -f "${integration_limbo}/current_ksnp_run.infile" ]; then
+	    echo -e "${fullpath}\t${sample_name}" >> "${integration_limbo}/current_ksnp_run.infile"
+	elif [ -f "${ksnp_repo}/master_paths.infile" ]; then
+	    cat "${ksnp_rpo}/master_paths.infile" > "${integration_limbo}/current_ksnp_run.infile"
+	    echo -e "${fullpath}\t${sample_name}" >> "${integration_limbo}/current_ksnp_run.infile"
+	else
+	    echo -e "${fullpath}\t${sample_name}" >> "${integration_limbo}/current_ksnp_run.infile"
+	fi
 	
-	$ksnp -in ${temp_dir}/ksnp.infile -outdir ${sample_name}_ksnp -k ${chosen_k}
+	## If this is the last sample, then we run ksnp
+	if [ "$last_sample" == "1" ]; then
+	    chosen_k=19  # this is temporary while we debug kchooser
+	    echo -e "${refgenome}\tReference" >> "${integration_limbo}/current_ksnp_run.infile"
+	    $ksnp -in ${integration_limbo}/current_ksnp_run.infile -outdir ${sample_name}_ksnp -k ${chosen_k} -CPU $threads
+	fi
 }
 
 
@@ -558,6 +600,10 @@ while [[ "${1+defined}"  ]]; do
             display_help
             exit 0
             ;;
+	-l | --last)
+	    last_sample=1
+	    shift 1
+	    ;;
 	    -o | --output)
 	        output_dir=$2
 	        shift 2
@@ -661,7 +707,7 @@ choose_reference
 ## Align to reference genome
 ref_align
 
-## Annotate the consensus file created in the reference alignment step
+# Annotate the consensus file created in the reference alignment step
 if [ "${consensus_file}" == "" ]; then
     echo -e "Consensus file creation failed; check the logs."
     echo -e "\tConsensus file creation failed; check the logs." >> WGS_LabNotebook.txt
@@ -682,16 +728,15 @@ echo -e "Beginning kSNP pipeline..."
 echo -e "Beginning kSNP pipeline..." >> WGS_LabNotebook.txt
 ## Perform N-masking on the trimmed reads from the Trimmomatic step
 ## Pass these into the kSNP pipeline
-#n_mask
+n_mask
 
 ## Run KChooser (we're still figuring out the debugging on this, to be implemented later)
 
-## Run kSNP3
-## this needs to be discussed before implemented.  We need to set up a continual reuse case
-#ksnp_run
+## Run pre-reqs to kSNP3
+ksnp_build
 
-echo -e "kSNP pipeline complete."
-echo -e "kSNP pipeline complete." >> WGS_LabNotebook.txt
+echo -e "kSNP prep complete."
+echo -e "kSNP prep complete." >> WGS_LabNotebook.txt
 
 #cleanup
 
