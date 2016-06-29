@@ -95,6 +95,8 @@ chosen_k=0  # k-value chosen by kchooser
 last_sample=0  # is this the last sample in the pipline?
 threads=1  # threads to use where applicable, recommend ~ 20
 
+export PERL5LIB="/s/angus/index/common/tools/vcftools/src/perl"
+export PATH="${PATH}:/s/angus/index/common/tools/tabix"
 
 ###############
 ## Functions ##
@@ -380,6 +382,9 @@ imetamos_run() {
         echo -e "nucmer=${nucmer}\nR2_gap=0.95\nCISA=${cisa}\nmakeblastdb=${blastdb}\nblastn=${blastn}" >> "${temp_dir}/CISA.config"
     fi
     
+    assembler=""
+    valid_assemblies=""
+    which_assemblies=()
     rm flowchart.svg
 }
 
@@ -504,7 +509,7 @@ choose_reference() {
 ref_align() {
     ## Align to the reference genome chosen in the previous steps
     ## We will use BWA mem here, since whole genome alignment is what it was designed to do
-    $bwa mem -t $threads "${refgenome}" ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/ref.sam
+    $bwa mem -t $threads ${refgenome} ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/ref.sam
     $samtools view -hbS ${temp_dir}/ref.sam > ${temp_dir}/ref.bam
     $samtools sort ${temp_dir}/ref.bam ${output_dir}/${sample_name}_ref_sorted
     
@@ -684,6 +689,8 @@ if [ "${run_assembly}" == "1" ]; then
     ## Annotate the best assembly, either CISA or the single best from MetAMOS
     prokka_annotate "assembly" "${best_assembly}"
     
+    best_assembly=""
+
     echo -e "Assembly pipeline complete."
     echo -e "Assembly pipeline complete." >> WGS_LabNotebook.txt
 fi
@@ -739,7 +746,7 @@ ksnp_build
 echo -e "kSNP prep complete."
 echo -e "kSNP prep complete." >> WGS_LabNotebook.txt
 
-#cleanup
+cleanup
 
 exit 0
 
