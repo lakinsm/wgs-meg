@@ -60,17 +60,17 @@ bcftools="/usr/local/bin/bcftools"
 vcfutils="/usr/local/bin/vcfutils.pl"
 PERL5LIB="/home/chris_dean/software/vcftools-vcftools-4491144/src/perl"
 tabix="/home/chris_dean/software/tabix-0.2.6"
-ksnp="/home/chris_dean/software/ksnp/kSNP3.01_Linux_package/kSNP3"
+ksnp="/usr/local/kSNP3/kSNP3"
 ksnp_repo="/home/chris_dean/sequence_data/ksnp_repository"
 integration_limbo="/home/chris_dean/sequence_data/ksnp_repository/awaiting_integration"
 Lmono="/home/chris_dean/sequence_data/list/Listeria.fa"
 
 ## Paths to output directories
-temp_dir=""
-output_dir=""
+temp_dir="/home/chris_dean/wgs_pipeline/wgs-meg/temp_dir"
+output_dir="/home/chris_dean/wgs_pipeline/wgs-meg/output_dir"
 
 ## Flags and variables used in the pipeline
-sample_name=""
+sample_name="Listeria"
 spp_pipeline="Lmonocytogenes"
 run_assembly=0
 best_assembly=""  # used in the event of less than 3 assemblies from metamos
@@ -562,7 +562,7 @@ ksnp_build() {
 	## If this is the last sample, then we run ksnp
 	if [ "$last_sample" == "1" ]; then
 	    chosen_k=19  # this is temporary while we debug kchooser
-	    echo -e "${refgenome}\tReference" >> "${integration_limbo}/current_ksnp_run.infile"
+	    echo -e "${refgenome}\tListeria" >> "${integration_limbo}/current_ksnp_run.infile"
 	    $ksnp -in ${integration_limbo}/current_ksnp_run.infile -outdir ${sample_name}_ksnp -k ${chosen_k} -CPU $threads
 	fi
 }
