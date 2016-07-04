@@ -1,17 +1,4 @@
-#!/usr/bin/env bash
-
-#################
-#################
-##
-##
-##
-##
-##
-##
-##
-##
-##
-#################
+#usr/bin/env bash
 
 if [ ! "$BASH_VERSION" ] ; then
     echo "Please do not use sh to run this script ($0), just execute it directly." 1>&2
@@ -54,35 +41,36 @@ display_help () {
 ## Variables ##
 ###############
 ## Paths to program executables or jar files where noted
-bbmap="/s/angus/index/common/tools/BBMap_35.85/bbmap/bbmerge.sh"
-metamos="/s/angus/index/common/tools/metAMOS-1.5rc3"
-nucmer="/s/angus/index/common/tools/MUMmer3.23/nucmer"
-cisa="/s/angus/index/common/tools/CISA1.3"
-blastdb="/usr/bin/makeblastdb"
-blastn="/usr/bin/blastn"
-prokka="/s/angus/index/common/tools/prokka/prokka-1.11/bin/prokka"
-trimmomatic="/s/angus/index/common/tools/Trimmomatic-0-1.32"
-bwa="/usr/bin/bwa"
-amrdb="/s/angus/index/databases/resistance_databases/databases/meta-marc/src/mmarc_groupIII_seqs.fasta"
-vfdb="/s/angus/index/databases/bwa_indexes/VFDB/New_VFDB_4_4_2016/VFDB_setA_nt_4_4_2016.fas"
-plasmiddb="/s/angus/index/databases/plasmid/all_plasmid_seqs.fasta"
-samratio="/s/angus/index/common/tools/samratio.jar"
-samtools="/usr/bin/samtools"
-bcftools="/usr/bin/bcftools"
-vcfutils="/usr/share/samtools/vcfutils.pl"
-PERL5LIB="/s/angus/index/common/tools/vcftools/src/perl"
-tabix="/s/angus/index/common/tools/tabix"
+bbmap="/usr/local/bin/bbmerge.sh"
+metamos="/home/chris_dean/software/metAMOS-1.5rc3"
+nucmer="/usr/bin/nucmer"
+cisa="/home/chris_dean/software/CISA1.3"
+blastdb="/usr/local/bin/makeblastdb"
+blastn="/usr/local/bin/blastn"
+prokka="/usr/local/bin/prokka"
+trimmomatic="/usr/local/Trimmomatic-0.36"
+bwa="/usr/local/bin/bwa"
+amrdb="/home/chris_dean/sequence_data/amrdb/mmarc.fasta"
+vfdb="/home/chris_dean/sequence_data/vfdb/VFDB.fa"
+plasmiddb="/home/chris_dean/sequence_data/plasmid/plasmid_seqs.fasta"
+samratio="/home/chris_dean/software/samratio.jar"
+samtools="/usr/local/bin/samtools"
+freebayes="/usr/local/bin/freebayes"
+bcftools="/usr/local/bin/bcftools"
+vcfutils="/usr/local/bin/vcfutils.pl"
+PERL5LIB="/home/chris_dean/software/vcftools-vcftools-4491144/src/perl"
+tabix="/home/chris_dean/software/tabix-0.2.6"
 ksnp="/usr/local/kSNP3/kSNP3"
-ksnp_repo="/s/angus/index/databases/ksnp_repository"
-integration_limbo="/s/angus/index/databases/ksnp_repository/awaiting_integration"
-Lmono="/s/angus/index/projs/listeria_wgs/mapping/genome_and_index/index/Listeria.fa"
+ksnp_repo="/home/chris_dean/sequence_data/ksnp_repository"
+integration_limbo="/home/chris_dean/sequence_data/ksnp_repository/awaiting_integration"
+Lmono="/home/chris_dean/sequence_data/list/Listeria.fa"
 
 ## Paths to output directories
-temp_dir=""
-output_dir=""
+temp_dir="/home/chris_dean/wgs_pipeline/wgs-meg/temp_dir"
+output_dir="/home/chris_dean/wgs_pipeline/wgs-meg/output_dir"
 
 ## Flags and variables used in the pipeline
-sample_name=""
+sample_name="Listeria"
 spp_pipeline="Lmonocytogenes"
 run_assembly=0
 best_assembly=""  # used in the event of less than 3 assemblies from metamos
@@ -90,13 +78,13 @@ consensus_file=""  # used to verify that a proper consensus was created
 insert=0  # insert size as determined by bbmerge
 kmer=0  # k-mer size determined by specialk in metamos
 genome_size=0  # genome size for this particular organism
-treshold=25  # quality score threshold for the N_masking step in kSNP
+threshold=25  # quality score threshold for the N_masking step in kSNP
 chosen_k=0  # k-value chosen by kchooser
 last_sample=0  # is this the last sample in the pipline?
 threads=1  # threads to use where applicable, recommend ~ 20
 
-export PERL5LIB="/s/angus/index/common/tools/vcftools/src/perl"
-export PATH="${PATH}:/s/angus/index/common/tools/tabix"
+export PERL5LIB="/home/chris_dean/software/vcftools-vcftools-4491144/src/perl"
+#export PATH="${PATH}:/s/angus/index/common/tools/tabix"
 
 ###############
 ## Functions ##
@@ -198,9 +186,9 @@ validate_paths() {
     	local missing="$missing:PERL5LIB;"
     fi
     
-    if [ ! -d "${tabix}" ]; then
-    	local missing="$missing:TabixPath;"
-    fi
+#    if [ ! -d "${tabix}" ]; then
+#    	local missing="$missing:TabixPath;"
+#    fi
     
     if [ ! -e "${ksnp}" ]; then
     	local missing="$missing:kSNP3;"
@@ -439,7 +427,7 @@ trim_reads() {
     if [ ! -f "${temp_dir}/1p.fastq" ] || [ ! -f "${temp_dir}/2p.fastq" ]; then
         echo -e "Beginning read trimming..."
         echo -e "\tBeginning read trimming..." >> WGS_LabNotebook.txt
-        java -jar "${trimmomatic}/trimmomatic-0.32.jar" PE -threads $threads -phred33 $forward $reverse "${temp_dir}/1p.fastq" "${temp_dir}/1u.fastq" "${temp_dir}/2p.fastq" "${temp_dir}/2u.fastq" ILLUMINACLIP:"${trimmomatic}/adapters/TruSeq3-PE.fa:2:30:10:3:TRUE" LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+        java -jar "${trimmomatic}/trimmomatic-0.36.jar" PE -threads $threads -phred33 $forward $reverse "${temp_dir}/1p.fastq" "${temp_dir}/1u.fastq" "${temp_dir}/2p.fastq" "${temp_dir}/2u.fastq" ILLUMINACLIP:"${trimmomatic}/adapters/TruSeq3-PE.fa:2:30:10:3:TRUE" LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
     else
         echo -e "Trimmed reads already detected, proceeding with alignments..."
         echo -e "\tTrimmed reads already detected, proceeding with alignments..." >> WGS_LabNotebook.txt
@@ -511,7 +499,8 @@ ref_align() {
     ## We will use BWA mem here, since whole genome alignment is what it was designed to do
     $bwa mem -t $threads ${refgenome} ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/ref.sam
     $samtools view -hbS ${temp_dir}/ref.sam > ${temp_dir}/ref.bam
-    $samtools sort ${temp_dir}/ref.bam ${output_dir}/${sample_name}_ref_sorted
+    $samtools sort ${temp_dir}/ref.bam -o ${output_dir}/${sample_name}_ref_sorted.bam
+    $samtools index ${output_dir}/${sample_name}_ref_sorted.bam
     
     ## We also want to keep reads that are unmapped to reference
     ## To do this, we can use the filter_sam.py script with a filter threshold of 70bp read length
@@ -519,7 +508,8 @@ ref_align() {
     cat ${temp_dir}/ref.sam | python3 ${RELPATH}/filter_sam.py - -l 70 > ${output_dir}/${sample_name}_reads_unmapped_to_ref.fasta
     
     ## Now we mpileup to create a consensus
-    $samtools mpileup -uD -f ${refgenome} ${output_dir}/${sample_name}_ref_sorted.bam | $bcftools view -bvcg - > ${temp_dir}/ref_raw.bcf
+    #$samtools mpileup -uD -f ${refgenome} ${output_dir}/${sample_name}_ref_sorted.bam | $bcftools view - > ${temp_dir}/ref_raw.bcf
+    $freebayes -p 1 -f ${refgenome} ${output_dir}/${sample_name}_ref_sorted.bam | $bcftools view - > ${temp_dir}/ref_raw.bcf    
     $bcftools view ${temp_dir}/ref_raw.bcf | $bgzip -c > ${output_dir}/${sample_name}_ref_snps.vcf.gz
     ${tabix}/tabix -p vcf ${output_dir}/${sample_name}_ref_snps.vcf.gz
     cat ${refgenome} | ${PERL5LIB}/vcf-consensus ${output_dir}/${sample_name}_ref_snps.vcf.gz > ${output_dir}/${sample_name}_consensus.fa
@@ -572,7 +562,7 @@ ksnp_build() {
 	## If this is the last sample, then we run ksnp
 	if [ "$last_sample" == "1" ]; then
 	    chosen_k=19  # this is temporary while we debug kchooser
-	    echo -e "${refgenome}\tReference" >> "${integration_limbo}/current_ksnp_run.infile"
+	    echo -e "${refgenome}\tListeria" >> "${integration_limbo}/current_ksnp_run.infile"
 	    $ksnp -in ${integration_limbo}/current_ksnp_run.infile -outdir ${sample_name}_ksnp -k ${chosen_k} -CPU $threads
 	fi
 }
