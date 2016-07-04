@@ -1,18 +1,5 @@
 #!/usr/bin/env bash
 
-#################
-#################
-##
-##
-##
-##
-##
-##
-##
-##
-##
-#################
-
 if [ ! "$BASH_VERSION" ] ; then
     echo "Please do not use sh to run this script ($0), just execute it directly." 1>&2
     exit 1
@@ -22,7 +9,6 @@ RELPATH="${BASH_SOURCE%/*}"
 
 shopt -s extglob
 
-
 ########
 # Help #
 ########
@@ -30,7 +16,7 @@ shopt -s extglob
 #Display help menu
 display_help () {
     echo "
-    Usage: wgs_meg_pipeline.sh [options] -1 forward_reads.fastq -2 reverse_reads.fastq
+    Usage: multi_sample_control_script.sh [options] -i <intput dir> -o <output dir> -td <temp dir> -t <thread>
     
         -h | --help                 help info
         
@@ -57,7 +43,7 @@ output_dir=""
 ## Flags and variables used in the pipeline
 spp_pipeline="Lmonocytogenes"
 run_assembly=0
-treshold=25  # quality score threshold for the N_masking step in kSNP
+threshold=25  # quality score threshold for the N_masking step in kSNP
 threads=1  # threads to use where applicable, recommend ~ 20
 
 
@@ -136,25 +122,4 @@ for i in `seq 0 $pos`; do
 	fi
 done
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 exit 0
-
