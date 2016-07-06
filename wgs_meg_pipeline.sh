@@ -53,7 +53,7 @@ bwa="/usr/local/bin/bwa"
 amrdb="/home/chris_dean/sequence_data/amrdb/mmarc.fasta"
 vfdb="/home/chris_dean/sequence_data/vfdb/VFDB.fa"
 plasmiddb="/home/chris_dean/sequence_data/plasmid/plasmid_seqs.fasta"
-samratio="/home/chris_dean/software/samratio.jar"
+csa="/usr/local/bin/csa"
 samtools="/usr/local/bin/samtools"
 freebayes="/usr/local/bin/freebayes"
 bcftools="/usr/local/bin/bcftools"
@@ -109,7 +109,6 @@ validate_paths() {
     prokka:                   ${prokka}
     Trimmomatic:              ${trimmomatic}
     BWA:                      ${bwa}
-    SamRatio:                 ${samratio}
     SAMTools:                 ${samtools}
     BCFTools:                 ${bcftools}
     VCFUtils:                 ${vcfutils}
@@ -165,11 +164,7 @@ validate_paths() {
     if [ ! -e "${bwa}" ]; then
     	local missing="$missing:BWA;"
     fi
-    
-    if [ ! -e "${samratio}" ]; then
-    	local missing="$missing:SamRatio;"
-    fi
-    
+
     if [ ! -e "${samtools}" ]; then
     	local missing="$missing:SAMTools;"
     fi
@@ -436,15 +431,13 @@ trim_reads() {
 
 
 amr_align() {
-    if [ ! -f "${output_dir}/${sample_name}_amr_parsed.csv" ]; then
+    if [ ! -f "${output_dir}/${sample_name}_amr_parsed.tabular" ]; then
         echo -e "Aligning to AMR database..."
         echo -e "\tAligning to AMR database..." >> WGS_LabNotebook.txt
-        $bwa aln ${amrdb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
-        $bwa aln ${amrdb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
-        $bwa sampe -n 1000 -N 1000 ${amrdb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/amr.sam
-        java -jar ${samratio} -d ${amrdb} -i ${temp_dir}/amr.sam -t 1 -o "${output_dir}/${sample_name}_amr_parsed.csv"
+        $bwa mem -t $threads ${amrdb} ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/amr.sam
+        $csa -ref_fp ${amrdb} -sam_fp ${temp_dir}/amr.sam -min 100 -max 100 -skip 5 -t 80 -samples 1 -out_fp "${output_dir}/${sample_name}_amr_parsed.tabular"
         
-        rm ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/amr.sam
+        rm ${temp_dir}/amr.sam
     else
         echo -e "AMR parsed file detected, proceeding..."
         echo -e "\tAMR parsed file detected, proceeding..." >> WGS_LabNotebook.txt
@@ -453,15 +446,13 @@ amr_align() {
 
 
 vfdb_align() {
-    if [ ! -f "${output_dir}/${sample_name}_vfdb_parsed.csv" ]; then
+    if [ ! -f "${output_dir}/${sample_name}_vfdb_parsed.tabular" ]; then
         echo -e "Aligning to Virulence database..."
         echo -e "\tAligning to Virulence database..." >> WGS_LabNotebook.txt
-        $bwa aln ${vfdb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
-        $bwa aln ${vfdb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
-        $bwa sampe -n 1000 -N 1000 ${vfdb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/vfdb.sam
-        java -jar ${samratio} -d ${vfdb} -i ${temp_dir}/vfdb.sam -t 1 -o "${output_dir}/${sample_name}_vfdb_parsed.csv"
+        $bwa mem -t $threads ${vfdb} ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/vfdb.sam
+        $csa -ref_fp ${vfdb} -sam_fp ${temp_dir}/vfdb.sam -min 100 -max 100 -skip 5 -t 80 -samples 1 -out_fp "${output_dir}/${sample_name}_vfdb_parsed.tabular"
         
-        rm ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/vfdb.sam
+        rm ${temp_dir}/vfdb.sam
     else
         echo -e "VFDB parsed file detected, proceeding..."
         echo -e "\tVFDB parsed file detected, proceeding..." >> WGS_LabNotebook.txt
@@ -470,15 +461,13 @@ vfdb_align() {
 
 
 plasmid_align() {
-    if [ ! -f "${output_dir}/${sample_name}_plasmid_parsed.csv" ]; then
+    if [ ! -f "${output_dir}/${sample_name}_plasmid_parsed.tabular" ]; then
         echo -e "Aligning to Plasmid database..."
         echo -e "\tAligning to Plasmid database..." >> WGS_LabNotebook.txt
-        $bwa aln ${plasmiddb} ${temp_dir}/1p.fastq -t $threads > ${temp_dir}/forward.sai
-        $bwa aln ${plasmiddb} ${temp_dir}/2p.fastq -t $threads > ${temp_dir}/reverse.sai
-        $bwa sampe -n 1000 -N 1000 ${plasmiddb} ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/plasmid.sam
-        java -jar ${samratio} -d ${plasmiddb} -i ${temp_dir}/plasmid.sam -t 1 -o "${output_dir}/${sample_name}_plasmid_parsed.csv"
+        $bwa mem -t $threads ${temp_dir}/1p.fastq ${temp_dir}/2p.fastq > ${temp_dir}/plasmid.sam
+        $csa -ref_fp ${plasmiddb} -sam_fp ${temp_dir}/plasmid.sam -min 100 -max 100 -skip 5 -t 80 -samples 1 -out_fp "${output_dir}/${sample_name}_plasmid_parsed.tabular"
         
-        rm ${temp_dir}/forward.sai ${temp_dir}/reverse.sai ${temp_dir}/plasmid.sam
+        rm ${temp_dir}/plasmid.sam
     else
         echo -e "Plasmid parsed file detected, proceeding..."
         echo -e "\tPlasmid parsed file detected, proceeding..." >> WGS_LabNotebook.txt
