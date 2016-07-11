@@ -35,7 +35,16 @@ Pipeline Options:
     -T      INT     Qual threshold for N-masking in kSNP
 
 #### Example
-TODO: Put stuff here
+Run alignment pipeline on Listeria samples
+```
+./multi_sample_control_script.sh -i input_dir -s test -spp Lmonocytogenes -out out_dir -td temp_dir -t 10 -T 25
+```
+
+Run assembly pipeline on Listeria samples
+```
+./multi_sample_control_script.sh -i input_dir -s -a test -spp Lmonocytogenes -out out_dir -td temp_dir -t 10 -T 25
+```
+
 
 #### Output
 TODO: Put stuff here
