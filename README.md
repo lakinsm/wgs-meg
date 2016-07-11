@@ -1,3 +1,4 @@
+#### Overview
 OWGS: An optimized whole genome sequencing pipeline for the annotation and analysis of bacterial genomes.
 
 #### Installation
