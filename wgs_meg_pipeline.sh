@@ -507,8 +507,8 @@ ref_align() {
 
 
 n_mask() {
-	## For KChooser, we need to first mask low-quality bases with N and then concatenate the resulting files
-	## into a single FASTA
+    ## For KChooser, we need to first mask low-quality bases with N and then concatenate the resulting files
+    ## into a single FASTA
     python3 ${RELPATH}/dna_threshold.py ${temp_dir}/1p.fastq $threshold > ${temp_dir}/masked_reads.fasta
     python3 ${RELPATH}/dna_threshold.py ${temp_dir}/2p.fastq $threshold >> ${temp_dir}/masked_reads.fasta
 }
@@ -552,7 +552,7 @@ ksnp_build() {
 	if [ "$last_sample" == "1" ]; then
 	    chosen_k=19  # this is temporary while we debug kchooser
 	    echo -e "${refgenome}\tListeria" >> "${integration_limbo}/current_ksnp_run.infile"
-	    $ksnp -in ${integration_limbo}/current_ksnp_run.infile -outdir ${sample_name}_ksnp -k ${chosen_k} -CPU $threads
+	    $ksnp -in ${integration_limbo}/current_ksnp_run.infile -outdir ${sample_name}_ksnp -k ${chosen_k} -CPU $threads -core -ML
 	fi
 }
 
@@ -728,4 +728,3 @@ echo -e "kSNP prep complete." >> WGS_LabNotebook.txt
 cleanup
 
 exit 0
-
