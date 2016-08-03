@@ -4,18 +4,18 @@ from jip import *
 
 
 @tool('trimmomatic')
-class Trimmomatic():
+class Trimmomatic(object):
     """\
     Quality filtering on input reads with Trimmomatic
 
     usage:
-        trimmomatic [-P <pipeline>] [-T <threads>] -input <inputs>... -output <output>
+        trimmomatic [-P <pipeline>] [-T <threads>] [-i <inputs>...] [-o <output>]
 
     Options:
         -P <pipeline>       SE or PE for single end and paired end, respectively [default: PE]
         -T <threads>        Number of threads to use [default: 1]
-        -input <inputs>     List of input .fastq.gz or .fastq files
-        -output <output>    Basename for output files
+        -i, --input <inputs>     List of input .fastq.gz or .fastq files
+        -o, --output <output>    Basename for output files
     """
     def validate(self):
         self.add_output('output_forward_paired', self.output + '_1P')
@@ -40,7 +40,7 @@ class WGSMegPipeline(object):
     Run the WGS MEG Pipeline for assembly and alignment characterization.
 
     usage:
-        master [-T <threads>] [-P <pipeline>] -input <inputs>... -output <output>
+        wgs-meg [-T <threads>] [-P <pipeline>] -input <inputs>... -output <output>
 
     Options:
         -P <pipeline>           SE or PE for single end and paired end, respectively [default: PE]
@@ -51,7 +51,6 @@ class WGSMegPipeline(object):
     """
 
     def pipeline(self):
-        out = self.output
         p = Pipeline()
         ref = p.run('trimmomatic',
                     pipeline=self.pipeline,
