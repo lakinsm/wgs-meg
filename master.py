@@ -19,9 +19,9 @@ class Trimmomatic(object):
     """
     def validate(self):
         self.add_output('output_forward_paired', self.output + '_1P')
-        self.add_output('output_forward_paired', self.output + '_2P')
-        self.add_output('output_forward_paired', self.output + '_1U')
-        self.add_output('output_forward_paired', self.output + '_2U')
+        self.add_output('output_reverse_paired', self.output + '_2P')
+        self.add_output('output_forward_unpaired', self.output + '_1U')
+        self.add_output('output_reverse_unpaired', self.output + '_2U')
 
     def get_command(self):
         return '''\
